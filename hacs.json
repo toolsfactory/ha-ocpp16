@@ -1,5 +1,5 @@
 {
-  "name": "Integration blueprint",
+  "name": "OCCP - OCPP 1.6 Central System",
   "homeassistant": "2026.8.0",
   "hacs": "2.0.5"
 }

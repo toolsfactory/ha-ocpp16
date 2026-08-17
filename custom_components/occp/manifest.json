@@ -1,0 +1,14 @@
+{
+  "domain": "occp",
+  "name": "OCCP - OCPP 1.6 Central System",
+  "codeowners": [
+    "@toolsfactory"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/toolsfactory/occp-ha",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/toolsfactory/occp-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

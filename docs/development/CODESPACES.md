@@ -1,6 +1,6 @@
 # GitHub Codespaces Development Guide
 
-Integration blueprint is fully compatible with GitHub Codespaces for cloud-based development.
+OCCP - OCPP 1.6 Central System is fully compatible with GitHub Codespaces for cloud-based development.
 
 ## Quick Start
 
