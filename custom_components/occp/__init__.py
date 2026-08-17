@@ -1,112 +1,86 @@
+"""OCCP Home-Assistant-Layer: verdrahtet ``occp.app.CentralSystemApp`` (aus
+dem Standalone-Kern, ``src/occp/``) mit Home Assistants Event-Loop, Device-
+Registry und Entity-Plattformen (ADR-0008).
+
+Kein ``homeassistant.*``-Import in ``src/occp/`` -- die gesamte HA-Anbindung
+lebt ausschließlich hier unter ``custom_components/occp/`` (CLAUDE.md).
 """
-Custom integration to integrate occp with Home Assistant.
 
-For more details about this integration, please refer to:
-https://github.com/toolsfactory/occp-ha
-"""
+from __future__ import annotations
 
-from datetime import timedelta
-from typing import TYPE_CHECKING
+import logging
+from pathlib import Path
 
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import homeassistant.helpers.config_validation as cv
-from homeassistant.loader import async_get_loaded_integration
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .api import OccpApiClient
-from .const import CONF_UPDATE_INTERVAL_HOURS, DEFAULT_UPDATE_INTERVAL_HOURS, DOMAIN, LOGGER
-from .coordinator import OccpDataUpdateCoordinator
-from .data import OccpData
-from .service_actions import async_setup_services
+from custom_components.occp.core.app import CentralSystemApp
+from custom_components.occp.core.config import AppConfig
+from custom_components.occp.core.domain.models import StateChangeEvent
 
-if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+from .const import (
+    CONF_AUTHORIZATION_FILE,
+    CONF_DEFAULT_ID_TAG,
+    CONF_HOST,
+    CONF_PORT,
+    DOMAIN,
+    PLATFORMS,
+    signal_new_charge_point,
+    signal_state_update,
+)
+from .runtime import OccpEntryData
+from .services import async_register_services, async_unregister_services
 
-    from .data import OccpConfigEntry
-
-PLATFORMS: list[Platform] = [
-    Platform.BINARY_SENSOR,
-    Platform.BUTTON,
-    Platform.FAN,
-    Platform.NUMBER,
-    Platform.SELECT,
-    Platform.SENSOR,
-    Platform.SWITCH,
-]
-
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+_LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """
-    Register the service actions.
-
-    Returns:
-        True once the actions are registered.
-
-    """
-    await async_setup_services(hass)
-    return True
-
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: OccpConfigEntry,
-) -> bool:
-    """
-    Set up a config entry.
-
-    Returns:
-        True once the coordinator has data and every platform is forwarded.
-
-    """
-    client = OccpApiClient(
-        username=entry.data[CONF_USERNAME],
-        password=entry.data[CONF_PASSWORD],
-        session=async_get_clientsession(hass),
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Baut ``CentralSystemApp`` auf und startet sie in ``hass.loop``
+    (ADR-0008 Abschnitt 1: ``await app.start()`` genügt, kein
+    ``hass.async_create_task`` -- ``start()`` selbst blockiert nicht)."""
+    authorization_file = entry.data.get(CONF_AUTHORIZATION_FILE)
+    config = AppConfig(
+        host=entry.data[CONF_HOST],
+        port=entry.data[CONF_PORT],
+        authorization_file=Path(authorization_file) if authorization_file else None,
     )
+    app = CentralSystemApp(config)
+    await app.start()
 
-    interval_hours = float(entry.options.get(CONF_UPDATE_INTERVAL_HOURS, DEFAULT_UPDATE_INTERVAL_HOURS))
-    coordinator = OccpDataUpdateCoordinator(
-        hass=hass,
-        logger=LOGGER,
-        name=DOMAIN,
-        config_entry=entry,
-        update_interval=timedelta(hours=interval_hours),
-        always_update=False,
+    entry_data = OccpEntryData(
+        app=app, default_id_tag=entry.data.get(CONF_DEFAULT_ID_TAG)
     )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry_data
 
-    entry.runtime_data = OccpData(
-        client=client,
-        integration=async_get_loaded_integration(hass, entry.domain),
-        coordinator=coordinator,
-    )
+    def _forward(event: StateChangeEvent) -> None:
+        if event.charge_point_id not in entry_data.known_charge_points:
+            entry_data.known_charge_points.add(event.charge_point_id)
+            async_dispatcher_send(
+                hass, signal_new_charge_point(entry.entry_id), event.charge_point_id
+            )
+        async_dispatcher_send(
+            hass,
+            signal_state_update(entry.entry_id, event.charge_point_id),
+            event,
+        )
 
-    await coordinator.async_config_entry_first_refresh()
+    unsubscribe = app.query_service.subscribe(_forward)
+    entry.async_on_unload(unsubscribe)
+
+    async_register_services(hass)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant,
-    entry: OccpConfigEntry,
-) -> bool:
-    """
-    Unload a config entry.
-
-    Returns:
-        True if every platform unloaded cleanly.
-
-    """
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-async def async_reload_entry(
-    hass: HomeAssistant,
-    entry: OccpConfigEntry,
-) -> None:
-    """Reload the config entry after its data or options changed."""
-    await hass.config_entries.async_reload(entry.entry_id)
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        domain_data: dict[str, OccpEntryData] = hass.data.get(DOMAIN, {})
+        entry_data = domain_data.pop(entry.entry_id, None)
+        if entry_data is not None:
+            await entry_data.app.stop()
+        if not domain_data:
+            async_unregister_services(hass)
+    return unloaded
