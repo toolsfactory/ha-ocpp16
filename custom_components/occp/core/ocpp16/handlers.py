@@ -1,30 +1,34 @@
-"""OCPP-1.6-Nachrichtenhandler (REQ-0001, REQ-0003–REQ-0010, REQ-0012–
-REQ-0015): einzige Stelle im Kern, die ``ocpp.v16`` direkt verwendet.
+"""OCPP-1.6-Nachrichtenhandler: einzige Stelle im Kern, die ``ocpp.v16`` direkt verwendet.
 
-``ChargePointHandler`` erbt von ``ocpp.v16.ChargePoint`` (ADR-0001) und ruft
+REQ-0001, REQ-0003-REQ-0010, REQ-0012-REQ-0015. ``ChargePointHandler`` erbt von ``ocpp.v16.ChargePoint`` (ADR-0001) und ruft
 für jede fachliche Wirkung ausschließlich Domänenservices aus ``occp.domain``
 auf — kein HA-Bezug, keine Vermischung wie beim Negativbeispiel lbbrhzn/ocpp
 (siehe architecture.md).
 """
 
-from __future__ import annotations
-
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 import functools
 import inspect
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Awaitable, Callable, Sequence, TypeVar
+from typing import TypeVar
 
 from ocpp.routing import on
-from ocpp.v16 import ChargePoint as OcppChargePoint
-from ocpp.v16 import call as ocpp_call
-from ocpp.v16 import call_result as ocpp_call_result
-from ocpp.v16 import datatypes as ocpp_datatypes
-from ocpp.v16 import enums as ocpp_enums
+from ocpp.v16 import (
+    ChargePoint as OcppChargePoint,
+    call as ocpp_call,
+    call_result as ocpp_call_result,
+    datatypes as ocpp_datatypes,
+    enums as ocpp_enums,
+)
 
 from custom_components.occp.core.domain.authorization import AuthorizationDecision, AuthorizationProvider
-from custom_components.occp.core.domain.commands import ChargingSchedulePeriodInfo, CompositeScheduleResult
+from custom_components.occp.core.domain.commands import (
+    ChargePointCallRejectedError,
+    ChargingSchedulePeriodInfo,
+    CompositeScheduleResult,
+)
 from custom_components.occp.core.domain.connector_state import ConnectorStateStore
 from custom_components.occp.core.domain.events import EventBus
 from custom_components.occp.core.domain.meter_values import MeterValueStore
@@ -37,26 +41,34 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MEASURAND = "Energy.Active.Import.Register"
 
 _F = TypeVar("_F", bound=Callable[..., Awaitable[object]])
+_R = TypeVar("_R")
+
+
+def _expect_response(response: _R | None) -> _R:
+    """Return `response`, raising if python-ocpp suppressed a CallError into `None`."""
+    if response is None:
+        raise ChargePointCallRejectedError("Charge Point hat den Aufruf mit einem CallError quittiert.")
+    return response
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _to_iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _parse_timestamp(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 
 def _to_id_tag_info(decision: AuthorizationDecision) -> ocpp_datatypes.IdTagInfo:
     return ocpp_datatypes.IdTagInfo(
-        status=decision.status.value,
+        status=ocpp_enums.AuthorizationStatus(decision.status.value),
         parent_id_tag=decision.parent_id_tag,
         expiry_date=_to_iso(decision.expiry_date) if decision.expiry_date else None,
     )
@@ -66,44 +78,47 @@ def _extract_meter_samples(meter_value: Sequence[dict]) -> list[MeterSample]:
     samples: list[MeterSample] = []
     for entry in meter_value:
         recorded_at = _parse_timestamp(entry["timestamp"])
-        for sampled in entry.get("sampled_value", []):
-            samples.append(
-                MeterSample(
-                    measurand=sampled.get("measurand", _DEFAULT_MEASURAND),
-                    value=str(sampled["value"]),
-                    unit=sampled.get("unit"),
-                    context=sampled.get("context"),
-                    phase=sampled.get("phase"),
-                    recorded_at=recorded_at,
-                )
+        samples.extend(
+            MeterSample(
+                measurand=sampled.get("measurand", _DEFAULT_MEASURAND),
+                value=str(sampled["value"]),
+                unit=sampled.get("unit"),
+                context=sampled.get("context"),
+                phase=sampled.get("phase"),
+                recorded_at=recorded_at,
             )
+            for sampled in entry.get("sampled_value", [])
+        )
     return samples
 
 
 def _log_handler_errors(func: _F) -> _F:
-    """Protokolliert unbehandelte Ausnahmen mit Charge-Point-Kontext, bevor
+    """Wrap `func` to log unhandled exceptions before re-raising.
+
+    Protokolliert unbehandelte Ausnahmen mit Charge-Point-Kontext, bevor
     sie erneut geworfen werden (REQ-0031 AC4) — python-ocpp fängt sie danach
     selbst ab und erzeugt daraus regulär einen ``CallError``.
     """
 
     @functools.wraps(func)
-    async def wrapper(self: "ChargePointHandler", *args: object, **kwargs: object):
+    async def wrapper(self: ChargePointHandler, *args: object, **kwargs: object):
         try:
             result = func(self, *args, **kwargs)
             if inspect.isawaitable(result):
                 result = await result
-            return result
         except Exception:
-            self.cp_logger.exception(
-                "Unbehandelter Fehler in Handler '%s'", func.__name__
-            )
+            self.cp_logger.exception("Unbehandelter Fehler in Handler '%s'", func.__name__)
             raise
+        else:
+            return result
 
     return wrapper  # type: ignore[return-value]
 
 
 @dataclass
 class HandlerServices:
+    """Domain services and heartbeat config a `ChargePointHandler` calls into."""
+
     registry: ChargePointRegistryStore
     connectors: ConnectorStateStore
     transactions: TransactionManager
@@ -115,6 +130,7 @@ class HandlerServices:
 
     @property
     def heartbeat_timeout_seconds(self) -> float:
+        """Return the watchdog timeout derived from the heartbeat interval."""
         # Entscheidung REQ-0003: 2x vereinbartes Intervall + feste Grace-Period.
         return 2 * self.heartbeat_interval_seconds + self.heartbeat_grace_period_seconds
 
@@ -130,6 +146,7 @@ class ChargePointHandler(OcppChargePoint):
         services: HandlerServices,
         cp_logger: logging.LoggerAdapter,
     ) -> None:
+        """Initialize the connection with its domain services and loggers."""
         # Eigener, gedrosselter Logger für die Bibliotheks-internen
         # send/receive-Zeilen (immer INFO, siehe python-ocpp): REQ-0031
         # verlangt vollständige Rohnachrichten nur bei DEBUG, alles andere
@@ -148,15 +165,19 @@ class ChargePointHandler(OcppChargePoint):
 
     @property
     def charge_point_id(self) -> str:
+        """Return the charge point's identity as used by python-ocpp."""
         return self.id
 
     def attach_watchdog_notifier(self, notify: Callable[[], None]) -> None:
+        """Register `notify` to be called on every inbound message."""
         self._watchdog_notify = notify
 
     async def close_connection(self, *, reason: str = "") -> None:
+        """Close the underlying WebSocket connection."""
         await self._connection.close(reason=reason)
 
     async def route_message(self, raw_msg: str) -> None:
+        """Log the raw message, notify the watchdog, then dispatch as usual."""
         self.cp_logger.debug("RX: %s", raw_msg)
         if self._watchdog_notify is not None:
             self._watchdog_notify()
@@ -167,12 +188,14 @@ class ChargePointHandler(OcppChargePoint):
         await super()._send(message)
 
     def _round_meter_value(self, value: int, *, field_name: str, action: str) -> int:
-        """Rundet ``meterStart``/``meterStop`` kaufmännisch auf ``int``
+        """Round `value` to `int`, logging when the input was not already one.
+
+        Rundet ``meterStart``/``meterStop`` kaufmännisch auf ``int``
         (ADR-0005, REQ-0006 AC4/REQ-0007 AC5) — die Schema-Validierung
         (``_compat.py``) akzeptiert dafür bereits Fließkommazahlen, die
         Domäne bleibt aber strikt ``int``-typisiert.
         """
-        rounded = round(value)
+        rounded = round(value)  # noqa: RUF057 -- annotated int, but real charge points send float (see docstring)
         if not isinstance(value, int):
             self.cp_logger.warning(
                 "%s: %s=%s ist keine Ganzzahl, wird auf %s gerundet (ADR-0005)",
@@ -194,6 +217,7 @@ class ChargePointHandler(OcppChargePoint):
         firmware_version: str | None = None,
         **kwargs: object,
     ) -> ocpp_call_result.BootNotification:
+        """Handle BootNotification.req: record the boot and accept it."""
         boot_at = _utcnow()
         self._services.registry.mark_boot(
             self.id,
@@ -218,6 +242,7 @@ class ChargePointHandler(OcppChargePoint):
     @on(ocpp_enums.Action.heartbeat)
     @_log_handler_errors
     async def on_heartbeat(self, **kwargs: object) -> ocpp_call_result.Heartbeat:
+        """Handle Heartbeat.req: reply with the current server time."""
         return ocpp_call_result.Heartbeat(current_time=_to_iso(_utcnow()))
 
     @on(ocpp_enums.Action.status_notification)
@@ -229,9 +254,8 @@ class ChargePointHandler(OcppChargePoint):
         status: str,
         **kwargs: object,
     ) -> ocpp_call_result.StatusNotification:
-        self._services.connectors.update(
-            self.id, connector_id, status=status, error_code=error_code
-        )
+        """Handle StatusNotification.req: update connector state and publish it."""
+        self._services.connectors.update(self.id, connector_id, status=status, error_code=error_code)
         self.cp_logger.info(
             "StatusNotification: connector=%s status=%s errorCode=%s",
             connector_id,
@@ -243,9 +267,8 @@ class ChargePointHandler(OcppChargePoint):
 
     @on(ocpp_enums.Action.authorize)
     @_log_handler_errors
-    async def on_authorize(
-        self, id_tag: str, **kwargs: object
-    ) -> ocpp_call_result.Authorize:
+    async def on_authorize(self, id_tag: str, **kwargs: object) -> ocpp_call_result.Authorize:
+        """Handle Authorize.req: return the idTag's authorization status."""
         decision = self._services.authorization.authorize(id_tag)
         self.cp_logger.info("Authorize idTag=%s -> %s", id_tag, decision.status.value)
         return ocpp_call_result.Authorize(id_tag_info=_to_id_tag_info(decision))
@@ -260,9 +283,8 @@ class ChargePointHandler(OcppChargePoint):
         timestamp: str,
         **kwargs: object,
     ) -> ocpp_call_result.StartTransaction:
-        meter_start = self._round_meter_value(
-            meter_start, field_name="meterStart", action="StartTransaction"
-        )
+        """Handle StartTransaction.req: open a transaction and return its id."""
+        meter_start = self._round_meter_value(meter_start, field_name="meterStart", action="StartTransaction")
         decision = self._services.authorization.authorize(id_tag)
         transaction = self._services.transactions.start_transaction(
             charge_point_id=self.id,
@@ -279,9 +301,7 @@ class ChargePointHandler(OcppChargePoint):
             meter_start,
             decision.status.value,
         )
-        self._services.events.publish(
-            StateChangeEvent(self.id, connector_id, transaction.transaction_id)
-        )
+        self._services.events.publish(StateChangeEvent(self.id, connector_id, transaction.transaction_id))
         return ocpp_call_result.StartTransaction(
             transaction_id=transaction.transaction_id,
             id_tag_info=_to_id_tag_info(decision),
@@ -299,9 +319,8 @@ class ChargePointHandler(OcppChargePoint):
         transaction_data: list[dict] | None = None,
         **kwargs: object,
     ) -> ocpp_call_result.StopTransaction:
-        meter_stop = self._round_meter_value(
-            meter_stop, field_name="meterStop", action="StopTransaction"
-        )
+        """Handle StopTransaction.req: close the transaction and record its meter values."""
+        meter_stop = self._round_meter_value(meter_stop, field_name="meterStop", action="StopTransaction")
         transaction = self._services.transactions.stop_transaction(
             transaction_id,
             meter_stop_wh=meter_stop,
@@ -325,9 +344,7 @@ class ChargePointHandler(OcppChargePoint):
                 meter_stop,
                 reason,
             )
-            self._services.events.publish(
-                StateChangeEvent(self.id, connector_id, transaction_id)
-            )
+            self._services.events.publish(StateChangeEvent(self.id, connector_id, transaction_id))
 
         if transaction_data:
             samples = _extract_meter_samples(transaction_data)
@@ -354,6 +371,7 @@ class ChargePointHandler(OcppChargePoint):
         transaction_id: int | None = None,
         **kwargs: object,
     ) -> ocpp_call_result.MeterValues:
+        """Handle MeterValues.req: record the reported samples."""
         samples = _extract_meter_samples(meter_value)
         self._services.meter_values.record(
             charge_point_id=self.id,
@@ -367,45 +385,41 @@ class ChargePointHandler(OcppChargePoint):
             transaction_id,
             len(samples),
         )
-        self._services.events.publish(
-            StateChangeEvent(self.id, connector_id, transaction_id)
-        )
+        self._services.events.publish(StateChangeEvent(self.id, connector_id, transaction_id))
         return ocpp_call_result.MeterValues()
 
     # -- Central-System-initiierte Aufrufe (REQ-0009/0010/0012/0013/0014) ---
 
-    async def remote_start_transaction(
-        self, connector_id: int | None, id_tag: str
-    ) -> str:
-        response = await self.call(
-            ocpp_call.RemoteStartTransaction(id_tag=id_tag, connector_id=connector_id)
+    async def remote_start_transaction(self, connector_id: int | None, id_tag: str) -> str:
+        """Send RemoteStartTransaction.req and return its status."""
+        response = _expect_response(
+            await self.call(ocpp_call.RemoteStartTransaction(id_tag=id_tag, connector_id=connector_id))
         )
         return str(response.status)
 
     async def remote_stop_transaction(self, transaction_id: int) -> str:
-        response = await self.call(
-            ocpp_call.RemoteStopTransaction(transaction_id=transaction_id)
-        )
+        """Send RemoteStopTransaction.req and return its status."""
+        response = _expect_response(await self.call(ocpp_call.RemoteStopTransaction(transaction_id=transaction_id)))
         return str(response.status)
 
     async def reset(self, reset_type: str) -> str:
-        response = await self.call(ocpp_call.Reset(type=reset_type))
+        """Send Reset.req and return its status."""
+        response = _expect_response(await self.call(ocpp_call.Reset(type=ocpp_enums.ResetType(reset_type))))
         return str(response.status)
 
     async def unlock_connector(self, connector_id: int) -> str:
-        response = await self.call(ocpp_call.UnlockConnector(connector_id=connector_id))
+        """Send UnlockConnector.req and return its status."""
+        response = _expect_response(await self.call(ocpp_call.UnlockConnector(connector_id=connector_id)))
         return str(response.status)
 
-    async def get_configuration(
-        self, keys: Sequence[str] | None
-    ) -> tuple[list[dict], list[str]]:
-        response = await self.call(
-            ocpp_call.GetConfiguration(key=list(keys) if keys else None)
-        )
+    async def get_configuration(self, keys: Sequence[str] | None) -> tuple[list[dict], list[str]]:
+        """Send GetConfiguration.req and return (known entries, unknown keys)."""
+        response = _expect_response(await self.call(ocpp_call.GetConfiguration(key=list(keys) if keys else None)))
         return list(response.configuration_key or []), list(response.unknown_key or [])
 
     async def change_configuration(self, key: str, value: str) -> str:
-        response = await self.call(ocpp_call.ChangeConfiguration(key=key, value=value))
+        """Send ChangeConfiguration.req and return its status."""
+        response = _expect_response(await self.call(ocpp_call.ChangeConfiguration(key=key, value=value)))
         return str(response.status)
 
     async def set_charging_profile(
@@ -415,14 +429,17 @@ class ChargePointHandler(OcppChargePoint):
         limit_watts: float,
         number_phases: int | None = None,
     ) -> str:
+        """Send SetChargingProfile.req with a TxDefaultProfile power limit."""
         # REQ-0023 v1: ausschließlich TxDefaultProfile, stackLevel 0, ein
         # sofort und dauerhaft wirksames chargingSchedulePeriod (kein
         # Zeitplan/Wiederholung, siehe ADR-0006). numberPhases (ADR-0006,
         # Ergänzung 2026-08-15b) wird nur bei explizitem Wert mitgeschickt --
         # CommandService hat den Wertebereich 1-3 bereits geprüft.
-        period_kwargs: dict[str, object] = {"start_period": 0, "limit": limit_watts}
-        if number_phases is not None:
-            period_kwargs["number_phases"] = number_phases
+        period = (
+            ocpp_datatypes.ChargingSchedulePeriod(start_period=0, limit=limit_watts, number_phases=number_phases)
+            if number_phases is not None
+            else ocpp_datatypes.ChargingSchedulePeriod(start_period=0, limit=limit_watts)
+        )
         profile = ocpp_datatypes.ChargingProfile(
             charging_profile_id=charging_profile_id,
             stack_level=0,
@@ -430,40 +447,40 @@ class ChargePointHandler(OcppChargePoint):
             charging_profile_kind=ocpp_enums.ChargingProfileKindType.absolute,
             charging_schedule=ocpp_datatypes.ChargingSchedule(
                 charging_rate_unit=ocpp_enums.ChargingRateUnitType.watts,
-                charging_schedule_period=[
-                    ocpp_datatypes.ChargingSchedulePeriod(**period_kwargs)
-                ],
+                charging_schedule_period=[period],
             ),
         )
-        response = await self.call(
-            ocpp_call.SetChargingProfile(
-                connector_id=connector_id, cs_charging_profiles=profile
-            )
+        response = _expect_response(
+            await self.call(ocpp_call.SetChargingProfile(connector_id=connector_id, cs_charging_profiles=profile))
         )
         return str(response.status)
 
     async def clear_charging_profile(self, connector_id: int) -> str:
+        """Send ClearChargingProfile.req for the connector's TxDefaultProfile."""
         # Kombinationsfilter statt id-Filter (ADR-0006): trifft fachlich
         # "das TxDefaultProfile an diesem Connector", unabhängig von der
         # chargingProfileId-Formel.
-        response = await self.call(
-            ocpp_call.ClearChargingProfile(
-                connector_id=connector_id,
-                charging_profile_purpose=ocpp_enums.ChargingProfilePurposeType.tx_default_profile,
-                stack_level=0,
+        response = _expect_response(
+            await self.call(
+                ocpp_call.ClearChargingProfile(
+                    connector_id=connector_id,
+                    charging_profile_purpose=ocpp_enums.ChargingProfilePurposeType.tx_default_profile,
+                    stack_level=0,
+                )
             )
         )
         return str(response.status)
 
-    async def get_composite_schedule(
-        self, connector_id: int, duration_seconds: int
-    ) -> CompositeScheduleResult:
+    async def get_composite_schedule(self, connector_id: int, duration_seconds: int) -> CompositeScheduleResult:
+        """Send GetCompositeSchedule.req and return the parsed schedule."""
         # REQ-0023 v1: chargingRateUnit fest 'W' angefragt (kein Ampere).
-        response = await self.call(
-            ocpp_call.GetCompositeSchedule(
-                connector_id=connector_id,
-                duration=duration_seconds,
-                charging_rate_unit=ocpp_enums.ChargingRateUnitType.watts,
+        response = _expect_response(
+            await self.call(
+                ocpp_call.GetCompositeSchedule(
+                    connector_id=connector_id,
+                    duration=duration_seconds,
+                    charging_rate_unit=ocpp_enums.ChargingRateUnitType.watts,
+                )
             )
         )
         status = str(response.status)
@@ -472,18 +489,11 @@ class ChargePointHandler(OcppChargePoint):
             return CompositeScheduleResult(
                 status=status,
                 connector_id=response.connector_id,
-                schedule_start=(
-                    _parse_timestamp(response.schedule_start)
-                    if response.schedule_start
-                    else None
-                ),
+                schedule_start=(_parse_timestamp(response.schedule_start) if response.schedule_start else None),
             )
 
         charging_rate_unit = schedule.get("charging_rate_unit")
-        if (
-            charging_rate_unit is not None
-            and charging_rate_unit != ocpp_enums.ChargingRateUnitType.watts.value
-        ):
+        if charging_rate_unit is not None and charging_rate_unit != ocpp_enums.ChargingRateUnitType.watts.value:
             # Der Charge Point ist laut Spezifikation nicht zwingend an die
             # angefragte Einheit gebunden -- keine Ampere-Watt-Umrechnung
             # (REQ-0023 Non-Goal), aber sichtbar machen (ADR-0006, analog zum
@@ -509,20 +519,19 @@ class ChargePointHandler(OcppChargePoint):
         return CompositeScheduleResult(
             status=status,
             connector_id=response.connector_id,
-            schedule_start=(
-                _parse_timestamp(response.schedule_start)
-                if response.schedule_start
-                else None
-            ),
+            schedule_start=(_parse_timestamp(response.schedule_start) if response.schedule_start else None),
             duration_seconds=schedule.get("duration"),
             charging_rate_unit=charging_rate_unit,
             periods=periods,
         )
 
     async def change_availability(self, connector_id: int, availability_type: str) -> str:
-        response = await self.call(
-            ocpp_call.ChangeAvailability(
-                connector_id=connector_id, type=availability_type
+        """Send ChangeAvailability.req and return its status."""
+        response = _expect_response(
+            await self.call(
+                ocpp_call.ChangeAvailability(
+                    connector_id=connector_id, type=ocpp_enums.AvailabilityType(availability_type)
+                )
             )
         )
         return str(response.status)

@@ -245,6 +245,9 @@ split-on-trailing-comma = false
     "T20",    # print() allowed in scripts
     "INP001", # Implicit namespace package (scripts are not a package)
 ]
+"custom_components/occp/core/console.py" = [
+    "T20", # print() is this file's actual output mechanism (interactive prompt_toolkit console)
+]
 "tests/*" = [
     "S101",    # assert is fine in tests
     "PLR2004", # Magic values are fine in tests

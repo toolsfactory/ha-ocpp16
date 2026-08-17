@@ -1,7 +1,7 @@
-"""``QueryService``-Implementierung (REQ-0011): lesende Facade über Registry,
-Connector- und Transaktionszustand, plus Change-Notification.
+"""``QueryService``-Implementierung (REQ-0011).
 
-Implementiert strukturell das in ``docs/architecture/interfaces.md``
+Lesende Facade über Registry, Connector- und Transaktionszustand, plus
+Change-Notification. Implementiert strukturell das in ``docs/architecture/interfaces.md``
 (ADR-0003, seit der Ergänzung 2026-08-15 inklusive ``get_connectors`` und
 ``get_meter_samples``) verbindliche ``QueryService``-Protocol. Beide
 Methoden wurden ursprünglich als OCCP-interne Erweiterung eingeführt (für
@@ -10,9 +10,7 @@ Ergänzung formal Bestandteil des Protocols — u. a. weil der künftige
 HA-Layer (REQ-0017/REQ-0018) dieselbe Statusübersicht benötigt.
 """
 
-from __future__ import annotations
-
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 from custom_components.occp.core.domain.connector_state import ConnectorStateStore
 from custom_components.occp.core.domain.events import EventBus
@@ -29,6 +27,8 @@ from custom_components.occp.core.domain.transactions import TransactionManager
 
 
 class QueryServiceImpl:
+    """Lesende Facade über Registry, Connector- und Transaktionszustand (REQ-0011)."""
+
     def __init__(
         self,
         *,
@@ -38,6 +38,7 @@ class QueryServiceImpl:
         meter_values: MeterValueStore,
         events: EventBus,
     ) -> None:
+        """Initialize the facade with the domain stores it reads from."""
         self._registry = registry
         self._connectors = connectors
         self._transactions = transactions
@@ -45,26 +46,29 @@ class QueryServiceImpl:
         self._events = events
 
     def get_charge_points(self) -> Sequence[ChargePointSnapshot]:
+        """Return snapshots for every known charge point."""
         return self._registry.list_all()
 
-    def get_connector(
-        self, charge_point_id: str, connector_id: int
-    ) -> ConnectorSnapshot | None:
+    def get_connector(self, charge_point_id: str, connector_id: int) -> ConnectorSnapshot | None:
+        """Return the connector's snapshot, or None if unknown."""
         return self._connectors.get(charge_point_id, connector_id)
 
     def get_transaction(self, transaction_id: int) -> TransactionSnapshot | None:
+        """Return the transaction's snapshot, or None if unknown."""
         return self._transactions.get(transaction_id)
 
-    def get_active_transactions(
-        self, charge_point_id: str | None = None
-    ) -> Sequence[TransactionSnapshot]:
+    def get_active_transactions(self, charge_point_id: str | None = None) -> Sequence[TransactionSnapshot]:
+        """Return active transactions, optionally scoped to one charge point."""
         return self._transactions.get_active_transactions(charge_point_id)
 
     def subscribe(self, listener: StateChangeListener) -> Callable[[], None]:
+        """Register `listener` on the event bus and return an unsubscribe callable."""
         return self._events.subscribe(listener)
 
     def get_connectors(self, charge_point_id: str) -> Sequence[ConnectorSnapshot]:
-        """Verbindlicher Bestandteil des ``QueryService``-Protocols seit der
+        """Return every connector of a charge point.
+
+        Verbindlicher Bestandteil des ``QueryService``-Protocols seit der
         Ergänzung 2026-08-15 zu ADR-0003 (wie ``get_meter_samples``):
         anders als ``get_connector`` (eine einzelne, bereits bekannte
         ``connector_id``) liefert diese Methode die Liste aller Connectors
@@ -80,7 +84,9 @@ class QueryServiceImpl:
         connector_id: int | None = None,
         transaction_id: int | None = None,
     ) -> Sequence[MeterSample]:
-        """Verbindlicher Bestandteil des ``QueryService``-Protocols seit der
+        """Return measurand-resolved samples, filtered by connector or transaction.
+
+        Verbindlicher Bestandteil des ``QueryService``-Protocols seit der
         Ergänzung 2026-08-15 zu ADR-0003, siehe ``domain.models.MeterSample``.
         """
         if transaction_id is not None:

@@ -4,8 +4,6 @@ Bewusst getrennt vom Standalone-Kern (``src/occp/``) gehalten -- keine
 ``homeassistant.*``-Importe im Kern (CLAUDE.md).
 """
 
-from __future__ import annotations
-
 DOMAIN = "occp"
 
 PLATFORMS = ["sensor", "switch"]
@@ -36,10 +34,11 @@ def signal_state_update(entry_id: str, charge_point_id: str) -> str:
 
 
 def signal_new_charge_point(entry_id: str) -> str:
-    """Signalname, wenn ein bisher unbekannter Charge Point erstmals eine
-    ``StateChangeEvent`` auslöst -- Grundlage für dynamische Entity-Anlage
-    (REQ-0017 AC1), da ADR-0008 selbst keine Aussage zum Erstanlage-Zeitpunkt
-    trifft."""
+    """Signalname, wenn ein bisher unbekannter Charge Point erstmals eine ``StateChangeEvent`` auslöst.
+
+    Grundlage für dynamische Entity-Anlage (REQ-0017 AC1), da ADR-0008
+    selbst keine Aussage zum Erstanlage-Zeitpunkt trifft.
+    """
     return f"{DOMAIN}_{entry_id}_new_charge_point"
 
 

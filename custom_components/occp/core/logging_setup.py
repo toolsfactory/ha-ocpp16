@@ -1,21 +1,22 @@
-"""Logging-Aufbau (REQ-0031): ein Logger je Modul (Standard
-``logging.getLogger(__name__)``-Muster), plus ein ``LoggerAdapter`` je
-aktiver Charge-Point-Verbindung für den ``charge_point_id``-Kontext (AC1/
-AC2). Log-Level ist zentral konfigurierbar (AC5); idTags werden vollständig
-geloggt (Entscheidung REQ-0031, keine Maskierung); Rotation/Aufbewahrung
-bleibt bewusst Betreiber-Sache (Non-Goal REQ-0031).
-"""
+"""Logging-Aufbau (REQ-0031).
 
-from __future__ import annotations
+Ein Logger je Modul (Standard ``logging.getLogger(__name__)``-Muster), plus
+ein ``LoggerAdapter`` je aktiver Charge-Point-Verbindung für den
+``charge_point_id``-Kontext (AC1/AC2). Log-Level ist zentral konfigurierbar
+(AC5); idTags werden vollständig geloggt (Entscheidung REQ-0031, keine
+Maskierung); Rotation/Aufbewahrung bleibt bewusst Betreiber-Sache (Non-Goal
+REQ-0031).
+"""
 
 import logging
 import sys
 
 
 class _DefaultChargePointIdFilter(logging.Filter):
-    """Setzt ``charge_point_id`` auf einen Platzhalter für Log-Zeilen ohne
-    Charge-Point-Bezug, damit der Formatter nicht mit ``KeyError`` scheitert
-    (technische Einschätzung architect-Agent, siehe REQ-0031).
+    """Setzt ``charge_point_id`` auf einen Platzhalter für Log-Zeilen ohne Charge-Point-Bezug.
+
+    Damit der Formatter nicht mit ``KeyError`` scheitert (technische
+    Einschätzung architect-Agent, siehe REQ-0031).
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -28,6 +29,7 @@ LOG_FORMAT = "%(asctime)s %(levelname)-8s [%(charge_point_id)s] %(name)s: %(mess
 
 
 def configure_logging(level: int | str = logging.INFO) -> None:
+    """Configure the root logger with OCCP's stdout format and filter."""
     root = logging.getLogger()
     root.setLevel(level)
 
@@ -48,8 +50,7 @@ def configure_logging(level: int | str = logging.INFO) -> None:
     logging.getLogger("websockets").setLevel(logging.WARNING)
 
 
-def get_charge_point_logger(
-    charge_point_id: str, *, logger_name: str = "occp.handlers"
-) -> logging.LoggerAdapter:
+def get_charge_point_logger(charge_point_id: str, *, logger_name: str = "occp.handlers") -> logging.LoggerAdapter:
+    """Return a logger adapter that tags every record with `charge_point_id`."""
     base_logger = logging.getLogger(logger_name)
     return logging.LoggerAdapter(base_logger, {"charge_point_id": charge_point_id})

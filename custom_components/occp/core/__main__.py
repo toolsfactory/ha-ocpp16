@@ -1,9 +1,8 @@
-"""Startpunkt des Standalone-Kerns: ``python -m occp`` bzw. das
-``occp``-Konsolenskript. Fährt WebSocket-Server, Logging und (bei
-vorhandenem Terminal) die interaktive Konsole zusammen hoch.
-"""
+"""Startpunkt des Standalone-Kerns: ``python -m occp`` bzw. das ``occp``-Konsolenskript.
 
-from __future__ import annotations
+Fährt WebSocket-Server, Logging und (bei vorhandenem Terminal) die
+interaktive Konsole zusammen hoch.
+"""
 
 import asyncio
 import logging
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Parse CLI arguments and run the standalone core until interrupted."""
     config = parse_args(argv)
     configure_logging(config.log_level)
 

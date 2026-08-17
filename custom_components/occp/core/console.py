@@ -1,4 +1,5 @@
-"""Interaktive Konsole (REQ-0032 Statusausgabe, REQ-0033 Steuerung),
+"""Interaktive Konsole (REQ-0032 Statusausgabe, REQ-0033 Steuerung).
+
 ADR-0002: ``prompt_toolkit`` (``PromptSession.prompt_async()`` +
 ``patch_stdout()``), als eigener ``asyncio.Task`` im selben Event Loop, nur
 gestartet, wenn ``sys.stdin.isatty()`` (siehe ``occp.app.CentralSystemApp.run``).
@@ -9,11 +10,10 @@ Statusübersicht (REQ-0032) — kein Bestätigungsschritt vor steuernden
 Aktionen, kein für Skripte wiederverwendbares Format.
 """
 
-from __future__ import annotations
-
+from collections.abc import Awaitable, Callable, Sequence
 import logging
 import shlex
-from typing import TYPE_CHECKING, Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
@@ -32,7 +32,7 @@ class ConsoleUsageError(Exception):
     """Syntaktisch ungültiges Kommando (REQ-0033 AC2/AC5)."""
 
 
-async def _cmd_status(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_status(app: CentralSystemApp, args: list[str]) -> str:
     charge_points: Sequence[ChargePointSnapshot] = app.query_service.get_charge_points()
     if not charge_points:
         return "Keine Charge Points verbunden."
@@ -44,22 +44,18 @@ async def _cmd_status(app: "CentralSystemApp", args: list[str]) -> str:
             f"vendor={cp.vendor or '-'} model={cp.model or '-'} "
             f"last_boot={cp.last_boot_at.isoformat() if cp.last_boot_at else '-'}"
         )
-        connectors: Sequence[ConnectorSnapshot] = app.query_service.get_connectors(
-            cp.charge_point_id
+        connectors: Sequence[ConnectorSnapshot] = app.query_service.get_connectors(cp.charge_point_id)
+        lines.extend(
+            f"    connector {connector.connector_id}: {connector.status}"
+            + (f" (errorCode={connector.error_code})" if connector.error_code else "")
+            for connector in sorted(connectors, key=lambda c: c.connector_id)
         )
-        for connector in sorted(connectors, key=lambda c: c.connector_id):
-            lines.append(
-                f"    connector {connector.connector_id}: {connector.status}"
-                + (f" (errorCode={connector.error_code})" if connector.error_code else "")
-            )
-        transactions: Sequence[TransactionSnapshot] = app.query_service.get_active_transactions(
-            cp.charge_point_id
+        transactions: Sequence[TransactionSnapshot] = app.query_service.get_active_transactions(cp.charge_point_id)
+        lines.extend(
+            f"    transaction {tx.transaction_id}: connector={tx.connector_id} "
+            f"idTag={tx.id_tag} started={tx.started_at.isoformat()}"
+            for tx in transactions
         )
-        for tx in transactions:
-            lines.append(
-                f"    transaction {tx.transaction_id}: connector={tx.connector_id} "
-                f"idTag={tx.id_tag} started={tx.started_at.isoformat()}"
-            )
     return "\n".join(lines)
 
 
@@ -68,24 +64,22 @@ def _require_args(args: list[str], count: int, usage: str) -> None:
         raise ConsoleUsageError(f"Usage: {usage}")
 
 
-async def _cmd_start(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_start(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 3, "start <chargePointId> <connectorId|-> <idTag>")
     charge_point_id, connector_arg, id_tag = args
     connector_id = None if connector_arg == "-" else int(connector_arg)
-    result = await app.command_service.remote_start_transaction(
-        charge_point_id, connector_id, id_tag
-    )
+    result = await app.command_service.remote_start_transaction(charge_point_id, connector_id, id_tag)
     return "Ladevorgang gestartet." if result.accepted else "Charge Point hat abgelehnt (Rejected)."
 
 
-async def _cmd_stop(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_stop(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 1, "stop <transactionId>")
     transaction_id = int(args[0])
     result = await app.command_service.remote_stop_transaction(transaction_id)
     return "Ladevorgang gestoppt." if result.accepted else "Charge Point hat abgelehnt (Rejected)."
 
 
-async def _cmd_reset(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_reset(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 2, "reset <chargePointId> <Soft|Hard>")
     charge_point_id, reset_type = args
     if reset_type not in ("Soft", "Hard"):
@@ -94,28 +88,25 @@ async def _cmd_reset(app: "CentralSystemApp", args: list[str]) -> str:
     return "Reset akzeptiert." if result.accepted else "Charge Point hat abgelehnt (Rejected)."
 
 
-async def _cmd_unlock(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_unlock(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 2, "unlock <chargePointId> <connectorId>")
     charge_point_id, connector_arg = args
     result = await app.command_service.unlock_connector(charge_point_id, int(connector_arg))
     return f"Ergebnis: {result.status}"
 
 
-async def _cmd_getconfig(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_getconfig(app: CentralSystemApp, args: list[str]) -> str:
     if len(args) < 1:
         raise ConsoleUsageError("Usage: getconfig <chargePointId> [key ...]")
     charge_point_id, *keys = args
     result = await app.command_service.get_configuration(charge_point_id, keys or None)
-    lines = [
-        f"{entry.key} = {entry.value} (readonly={entry.readonly})"
-        for entry in result.entries
-    ]
+    lines = [f"{entry.key} = {entry.value} (readonly={entry.readonly})" for entry in result.entries]
     if result.unknown_keys:
         lines.append(f"unbekannte Schlüssel: {', '.join(result.unknown_keys)}")
     return "\n".join(lines) if lines else "Keine Konfigurationswerte gemeldet."
 
 
-async def _cmd_setconfig(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_setconfig(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 3, "setconfig <chargePointId> <key> <value>")
     charge_point_id, key, value = args
     result = await app.command_service.change_configuration(charge_point_id, key, value)
@@ -124,11 +115,9 @@ async def _cmd_setconfig(app: "CentralSystemApp", args: list[str]) -> str:
     return f"Ergebnis: {result.status}"
 
 
-async def _cmd_setlimit(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_setlimit(app: CentralSystemApp, args: list[str]) -> str:
     if not 3 <= len(args) <= 4:
-        raise ConsoleUsageError(
-            "Usage: setlimit <chargePointId> <connectorId> <watt> [numberPhases]"
-        )
+        raise ConsoleUsageError("Usage: setlimit <chargePointId> <connectorId> <watt> [numberPhases]")
     charge_point_id, connector_arg, watt_arg, *number_phases_arg = args
     number_phases = int(number_phases_arg[0]) if number_phases_arg else None
     result = await app.command_service.set_charging_profile(
@@ -137,25 +126,19 @@ async def _cmd_setlimit(app: "CentralSystemApp", args: list[str]) -> str:
     return f"Ergebnis: {result.status} (chargingProfileId={result.charging_profile_id})"
 
 
-async def _cmd_clearlimit(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_clearlimit(app: CentralSystemApp, args: list[str]) -> str:
     _require_args(args, 2, "clearlimit <chargePointId> <connectorId>")
     charge_point_id, connector_arg = args
-    result = await app.command_service.clear_charging_profile(
-        charge_point_id, int(connector_arg)
-    )
+    result = await app.command_service.clear_charging_profile(charge_point_id, int(connector_arg))
     return f"Ergebnis: {result.status}"
 
 
-async def _cmd_getlimit(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_getlimit(app: CentralSystemApp, args: list[str]) -> str:
     if not 2 <= len(args) <= 3:
-        raise ConsoleUsageError(
-            "Usage: getlimit <chargePointId> <connectorId> [durationSeconds]"
-        )
+        raise ConsoleUsageError("Usage: getlimit <chargePointId> <connectorId> [durationSeconds]")
     charge_point_id, connector_arg, *duration_arg = args
     kwargs = {"duration_seconds": int(duration_arg[0])} if duration_arg else {}
-    result = await app.command_service.get_composite_schedule(
-        charge_point_id, int(connector_arg), **kwargs
-    )
+    result = await app.command_service.get_composite_schedule(charge_point_id, int(connector_arg), **kwargs)
     if result.status != "Accepted":
         return f"Ergebnis: {result.status}"
     if not result.periods:
@@ -165,12 +148,11 @@ async def _cmd_getlimit(app: "CentralSystemApp", args: list[str]) -> str:
     start = result.schedule_start.isoformat() if result.schedule_start else "-"
     duration = result.duration_seconds if result.duration_seconds is not None else "-"
     lines = [f"Ergebnis: Accepted (Einheit={unit}, ab {start}, {duration}s)"]
-    for period in result.periods:
-        lines.append(f"    ab +{period.start_offset_seconds}s: {period.limit_watts} {unit}")
+    lines.extend(f"    ab +{period.start_offset_seconds}s: {period.limit_watts} {unit}" for period in result.periods)
     return "\n".join(lines)
 
 
-async def _cmd_help(app: "CentralSystemApp", args: list[str]) -> str:
+async def _cmd_help(app: CentralSystemApp, args: list[str]) -> str:
     return _help_text()
 
 
@@ -208,7 +190,7 @@ def _help_text() -> str:
     )
 
 
-async def _dispatch(app: "CentralSystemApp", line: str) -> str:
+async def _dispatch(app: CentralSystemApp, line: str) -> str:
     try:
         tokens = shlex.split(line)
     except ValueError as exc:
@@ -230,12 +212,13 @@ async def _dispatch(app: "CentralSystemApp", line: str) -> str:
         return f"Fehler: {exc}"
     except ValueError as exc:
         return f"Ungültiges Argument: {exc}"
-    except Exception:  # noqa: BLE001 - Konsole darf den Kern nie mitreißen.
+    except Exception:
         logger.exception("Unbehandelter Fehler bei Konsolenkommando: %s", line)
         return "Unerwarteter Fehler — siehe Log für Details."
 
 
-async def run_console(app: "CentralSystemApp") -> None:
+async def run_console(app: CentralSystemApp) -> None:
+    """Run the interactive console loop until EOF or Ctrl-C."""
     completer = WordCompleter(list(_COMMANDS.keys()), ignore_case=True)
     session: PromptSession[str] = PromptSession("occp> ", completer=completer)
 
@@ -244,7 +227,7 @@ async def run_console(app: "CentralSystemApp") -> None:
         while True:
             try:
                 line = await session.prompt_async()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 print("Konsole beendet.")
                 return
 

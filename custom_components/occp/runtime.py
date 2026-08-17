@@ -1,4 +1,4 @@
-"""Laufzeitdaten je Config Entry (``hass.data[DOMAIN][entry.entry_id]``).
+"""Laufzeitdaten je Config Entry (``entry.runtime_data``).
 
 Eigenes, kleines Modul statt Definition in ``__init__.py``, damit
 ``sensor.py``/``switch.py``/``services.py`` es importieren können, ohne einen
@@ -6,11 +6,10 @@ Importzyklus mit ``__init__.py`` (das seinerseits Entity-Plattformen anstößt)
 zu erzeugen.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 
 from custom_components.occp.core.app import CentralSystemApp
+from homeassistant.config_entries import ConfigEntry
 
 
 @dataclass
@@ -24,3 +23,6 @@ class OccpEntryData:
     # ``const.signal_new_charge_point``) -- dieses Set verhindert doppelte
     # "neuer Charge Point"-Dispatcher-Signale für bereits bekannte IDs.
     known_charge_points: set[str] = field(default_factory=set)
+
+
+type OccpConfigEntry = ConfigEntry[OccpEntryData]

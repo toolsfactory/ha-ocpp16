@@ -5,12 +5,10 @@ für die Prozesslaufzeit) — Persistenz über einen Neustart hinaus ist laut
 architecture.md explizit Non-Goal für Stufe 3.
 """
 
-from __future__ import annotations
-
-import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Sequence
+import itertools
 
 from custom_components.occp.core.domain.models import TransactionSnapshot
 
@@ -42,7 +40,10 @@ class _TransactionRecord:
 
 
 class TransactionManager:
+    """Vergibt Transaktions-IDs und verwaltet den Transaktions-Lebenszyklus."""
+
     def __init__(self) -> None:
+        """Initialize with no recorded transactions."""
         self._records: dict[int, _TransactionRecord] = {}
         self._active_by_connector: dict[tuple[str, int], int] = {}
         self._id_generator = itertools.count(1)
@@ -56,6 +57,7 @@ class TransactionManager:
         meter_start_wh: int,
         started_at: datetime,
     ) -> TransactionSnapshot:
+        """Open a new transaction on the connector and return its snapshot."""
         transaction_id = next(self._id_generator)
         record = _TransactionRecord(
             transaction_id=transaction_id,
@@ -95,12 +97,12 @@ class TransactionManager:
         return record.to_snapshot()
 
     def get(self, transaction_id: int) -> TransactionSnapshot | None:
+        """Return the transaction's snapshot, or None if unknown."""
         record = self._records.get(transaction_id)
         return record.to_snapshot() if record is not None else None
 
-    def get_active_transactions(
-        self, charge_point_id: str | None = None
-    ) -> Sequence[TransactionSnapshot]:
+    def get_active_transactions(self, charge_point_id: str | None = None) -> Sequence[TransactionSnapshot]:
+        """Return active transactions, optionally scoped to one charge point."""
         result = []
         for transaction_id in self._active_by_connector.values():
             record = self._records[transaction_id]
@@ -109,11 +111,11 @@ class TransactionManager:
             result.append(record.to_snapshot())
         return result
 
-    def get_active_transaction_id(
-        self, charge_point_id: str, connector_id: int
-    ) -> int | None:
+    def get_active_transaction_id(self, charge_point_id: str, connector_id: int) -> int | None:
+        """Return the active transaction id for the connector, if any."""
         return self._active_by_connector.get((charge_point_id, connector_id))
 
     def is_active(self, transaction_id: int) -> bool:
+        """Return whether the transaction exists and has not been stopped."""
         record = self._records.get(transaction_id)
         return record is not None and record.stopped_at is None

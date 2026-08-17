@@ -1,8 +1,10 @@
 set_power_limit:
-  target:
-    device:
-      integration: occp
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
     limit_w:
       required: true
       selector:
@@ -17,9 +19,12 @@ set_power_limit:
           options: ["1", "2", "3"]
 
 clear_power_limit:
-  target:
-    device:
-      integration: occp
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
 
 authorize_id_token:
   fields:

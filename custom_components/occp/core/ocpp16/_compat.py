@@ -1,6 +1,7 @@
-"""Bekannter Nachbau-Nachteil von python-ocpp (siehe ADR-0001, Konsequenzen/
-Negativ: "Deckt die Bibliothek eine benötigte OCPP-1.6-Nuance nicht oder
-fehlerhaft ab, entsteht ... ein lokaler Workaround").
+"""Bekannter Nachbau-Nachteil von python-ocpp (siehe ADR-0001).
+
+Konsequenzen/Negativ: "Deckt die Bibliothek eine benötigte OCPP-1.6-Nuance
+nicht oder fehlerhaft ab, entsteht ... ein lokaler Workaround".
 
 ``ocpp.messages._validate_payload`` meldet Schema-Verletzungen (z. B.
 zusätzliche/unbekannte Felder) unabhängig von der OCPP-Version immer als
@@ -54,14 +55,10 @@ Patch sorgt nur dafür, dass die Nachricht die Schema-Validierung überhaupt
 passiert.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
+from ocpp.exceptions import FormatViolationError, NotImplementedError, NotSupportedError
 import ocpp.messages
-from ocpp.exceptions import (
-    FormatViolationError,
-    NotImplementedError,
-    NotSupportedError,
-)
 
 FormatViolationError.code = "FormationViolation"
 NotImplementedError.code = "NotSupported"
@@ -73,9 +70,9 @@ NotSupportedError.code = "NotImplemented"
 # nicht versehentlich den bereits gepatchten Wrapper als "Original" übernimmt
 # -- das würde zu unbegrenzter Selbst-Rekursion führen.
 if not hasattr(ocpp.messages, "_occp_original_get_validator"):
-    ocpp.messages._occp_original_get_validator = ocpp.messages.get_validator
+    ocpp.messages._occp_original_get_validator = ocpp.messages.get_validator  # noqa: SLF001 # type: ignore[attr-defined]
 
-_original_get_validator = ocpp.messages._occp_original_get_validator
+_original_get_validator = ocpp.messages._occp_original_get_validator  # noqa: SLF001 # type: ignore[attr-defined]
 
 _TOLERANT_NUMERIC_FIELDS = {
     "StartTransaction": "meterStart",
@@ -83,15 +80,14 @@ _TOLERANT_NUMERIC_FIELDS = {
 }
 
 
-def _tolerant_get_validator(
-    message_type_id: int, action: str, ocpp_version: str, parse_float: Callable = float
-):
-    validator = _original_get_validator(
-        message_type_id, action, ocpp_version, parse_float
-    )
+def _tolerant_get_validator(message_type_id: int, action: str, ocpp_version: str, parse_float: Callable = float):
+    validator = _original_get_validator(message_type_id, action, ocpp_version, parse_float)
     field_name = _TOLERANT_NUMERIC_FIELDS.get(action)
     if field_name is not None:
-        field_schema = validator.schema.get("properties", {}).get(field_name)
+        # jsonschema types Validator.schema as `dict | bool` (a JSON Schema value can
+        # itself be a bare bool) -- for python-ocpp's message schemas it is always a dict.
+        schema: dict = validator.schema  # type: ignore[assignment]
+        field_schema = schema.get("properties", {}).get(field_name)
         if field_schema is not None and field_schema.get("type") == "integer":
             field_schema["type"] = ["integer", "number"]
     return validator

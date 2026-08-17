@@ -1,7 +1,8 @@
-"""WebSocket-Transport (REQ-0001, REQ-0027): Subprotokoll-Aushandlung
-``ocpp1.6``, Charge-Point-Identität aus dem URL-Pfad, Verbindungs-
-Lebenszyklus (Connect/Disconnect-Logging REQ-0031, Konfliktbehandlung bei
-doppelter Identität REQ-0001 AC4).
+"""WebSocket-Transport (REQ-0001, REQ-0027).
+
+Subprotokoll-Aushandlung ``ocpp1.6``, Charge-Point-Identität aus dem
+URL-Pfad, Verbindungs-Lebenszyklus (Connect/Disconnect-Logging REQ-0031,
+Konfliktbehandlung bei doppelter Identität REQ-0001 AC4).
 
 ``websockets.serve(..., subprotocols=["ocpp1.6"])`` lehnt Verbindungen ohne
 gemeinsames Subprotokoll bereits auf Bibliotheksebene ab (siehe
@@ -13,13 +14,12 @@ das erste in ``subprotocols`` gelistete gemeinsame Protokoll — mit nur einem
 Eintrag ("ocpp1.6") ist das Ergebnis eindeutig.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 
 import websockets
 from websockets.asyncio.server import Server, ServerConnection, serve
+from websockets.typing import Subprotocol
 
 from custom_components.occp.core.config import AppConfig
 from custom_components.occp.core.domain.models import StateChangeEvent
@@ -36,9 +36,7 @@ def _extract_charge_point_id(connection: ServerConnection) -> str | None:
     return charge_point_id or None
 
 
-async def _run_connection(
-    connection: ServerConnection, *, services: HandlerServices
-) -> None:
+async def _run_connection(connection: ServerConnection, *, services: HandlerServices) -> None:
     charge_point_id = _extract_charge_point_id(connection)
     if not charge_point_id:
         logger.warning(
@@ -49,9 +47,7 @@ async def _run_connection(
         return
 
     cp_logger = get_charge_point_logger(charge_point_id)
-    handler = ChargePointHandler(
-        charge_point_id, connection, services=services, cp_logger=cp_logger
-    )
+    handler = ChargePointHandler(charge_point_id, connection, services=services, cp_logger=cp_logger)
 
     previous = services.registry.register_connection(charge_point_id, handler)
     if previous is not None:
@@ -82,17 +78,14 @@ async def _run_connection(
         services.events.publish(StateChangeEvent(charge_point_id, None, None))
 
 
-async def _on_heartbeat_timeout(
-    handler: ChargePointHandler, cp_logger: logging.LoggerAdapter
-) -> None:
-    cp_logger.warning(
-        "Kein Lebenszeichen innerhalb des Toleranzfensters (REQ-0003) — "
-        "trenne Verbindung"
-    )
+async def _on_heartbeat_timeout(handler: ChargePointHandler, cp_logger: logging.LoggerAdapter) -> None:
+    cp_logger.warning("Kein Lebenszeichen innerhalb des Toleranzfensters (REQ-0003) — trenne Verbindung")
     await handler.close_connection(reason="heartbeat timeout")
 
 
 async def start_server(config: AppConfig, services: HandlerServices) -> Server:
+    """Start the OCPP 1.6 WebSocket server and return the bound `Server`."""
+
     async def handler(connection: ServerConnection) -> None:
         await _run_connection(connection, services=services)
 
@@ -100,7 +93,7 @@ async def start_server(config: AppConfig, services: HandlerServices) -> Server:
         handler,
         config.host,
         config.port,
-        subprotocols=["ocpp1.6"],
+        subprotocols=[Subprotocol("ocpp1.6")],
     )
     logger.info("OCPP-1.6-WebSocket-Server läuft auf %s:%s", config.host, config.port)
     return server

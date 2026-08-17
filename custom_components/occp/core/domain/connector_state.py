@@ -1,18 +1,18 @@
-"""Connector-Statusverwaltung (REQ-0004): aktueller Status je Connector,
-inkl. ``connectorId`` 0 (Ladestation als Ganzes), inkl. ``errorCode``.
+"""Connector-Statusverwaltung (REQ-0004).
+
+Aktueller Status je Connector, inkl. ``connectorId`` 0 (Ladestation als
+Ganzes), inkl. ``errorCode``.
 """
 
-from __future__ import annotations
-
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Sequence
+from datetime import UTC, datetime
 
 from custom_components.occp.core.domain.models import ConnectorSnapshot
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass
@@ -31,6 +31,7 @@ class ConnectorStateStore:
     """
 
     def __init__(self) -> None:
+        """Initialize with no recorded connectors."""
         self._records: dict[tuple[str, int], _ConnectorRecord] = {}
 
     def update(
@@ -41,13 +42,11 @@ class ConnectorStateStore:
         status: str,
         error_code: str | None,
     ) -> None:
-        self._records[(charge_point_id, connector_id)] = _ConnectorRecord(
-            status=status, error_code=error_code
-        )
+        """Overwrite the connector's status and error code."""
+        self._records[(charge_point_id, connector_id)] = _ConnectorRecord(status=status, error_code=error_code)
 
-    def get(
-        self, charge_point_id: str, connector_id: int
-    ) -> ConnectorSnapshot | None:
+    def get(self, charge_point_id: str, connector_id: int) -> ConnectorSnapshot | None:
+        """Return the connector's snapshot, or None if unknown."""
         record = self._records.get((charge_point_id, connector_id))
         if record is None:
             return None
@@ -58,9 +57,8 @@ class ConnectorStateStore:
             error_code=record.error_code,
         )
 
-    def list_for_charge_point(
-        self, charge_point_id: str
-    ) -> Sequence[ConnectorSnapshot]:
+    def list_for_charge_point(self, charge_point_id: str) -> Sequence[ConnectorSnapshot]:
+        """Return every connector's snapshot for the charge point."""
         result = []
         for (cp_id, connector_id), record in self._records.items():
             if cp_id != charge_point_id:

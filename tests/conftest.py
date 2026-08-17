@@ -1,18 +1,13 @@
 """Shared fixtures for the occp tests."""
 
 from collections.abc import Generator
-from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import DOMAIN
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
 from homeassistant.core import HomeAssistant
-
-# The response the demo endpoint returns; the client turns it into the device payload.
-API_RESPONSE: dict[str, Any] = {"userId": 1, "id": 1, "title": "demo", "body": "demo"}
 
 
 @pytest.fixture(autouse=True)
@@ -21,41 +16,39 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
 
 
 @pytest.fixture
-def mock_api() -> Generator[AsyncMock]:
-    """Replace the client's HTTP layer, keeping its payload logic under test."""
-    with patch(
-        "custom_components.occp.api.client.OccpApiClient._api_wrapper",
-        new_callable=AsyncMock,
-        return_value=API_RESPONSE,
-    ) as api_wrapper:
-        yield api_wrapper
+def mock_app_start_stop() -> Generator[None]:
+    """Patch `CentralSystemApp.start`/`stop` so setup never binds a real socket."""
+    with (
+        patch("custom_components.occp.core.app.CentralSystemApp.start", new_callable=AsyncMock),
+        patch("custom_components.occp.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
+    ):
+        yield
 
 
 @pytest.fixture
-def config_entry() -> MockConfigEntry:
+def mock_config_entry() -> MockConfigEntry:
     """Return a config entry for this integration."""
     return MockConfigEntry(
         domain=DOMAIN,
-        title="demo",
-        unique_id="demo",
-        data={CONF_USERNAME: "demo", CONF_PASSWORD: "secret"},
+        title="OCCP (0.0.0.0:9000)",
+        unique_id="0.0.0.0:9000",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9000},
     )
 
 
 @pytest.fixture
 async def init_integration(
     hass: HomeAssistant,
-    mock_api: AsyncMock,
-    config_entry: MockConfigEntry,
+    mock_app_start_stop: None,
+    mock_config_entry: MockConfigEntry,
 ) -> MockConfigEntry:
-    """
-    Set up the integration from a config entry.
+    """Set up the integration from a config entry.
 
     Returns:
         The config entry, now loaded.
 
     """
-    config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(config_entry.entry_id)
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    return config_entry
+    return mock_config_entry

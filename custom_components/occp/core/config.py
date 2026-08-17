@@ -7,16 +7,16 @@ Autorisierungsliste (REQ-0005) sind das, was für den Betrieb des Kerns
 zwingend nötig ist.
 """
 
-from __future__ import annotations
-
 import argparse
-import logging
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class AppConfig:
+    """Startkonfiguration des Standalone-Kerns."""
+
     host: str = "0.0.0.0"
     port: int = 9000
     log_level: int = logging.INFO
@@ -26,6 +26,7 @@ class AppConfig:
 
     @property
     def heartbeat_timeout_seconds(self) -> float:
+        """Return the watchdog timeout derived from the heartbeat interval."""
         # Entscheidung REQ-0003: 2x vereinbartes Intervall + feste Grace-Period.
         return 2 * self.heartbeat_interval_seconds + self.heartbeat_grace_period_seconds
 
@@ -38,6 +39,7 @@ def _parse_log_level(value: str) -> int:
 
 
 def parse_args(argv: list[str] | None = None) -> AppConfig:
+    """Parse standalone-core CLI arguments into an `AppConfig`."""
     parser = argparse.ArgumentParser(
         prog="occp",
         description="OCCP Standalone-Kern: OCPP-1.6-Central-System.",

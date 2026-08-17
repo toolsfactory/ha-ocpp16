@@ -6,34 +6,34 @@ Jede eingehende Nachricht gilt als Lebenszeichen (REQ-0003 AC3), nicht nur
 Intervall + feste Grace-Period (Entscheidung REQ-0003).
 """
 
-from __future__ import annotations
-
 import asyncio
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 
 class ConnectionWatchdog:
+    """Ruft `on_timeout` auf, wenn keine Aktivität innerhalb des Toleranzfensters eintrifft."""
+
     def __init__(self, *, timeout_seconds: float, on_timeout: Callable[[], Awaitable[None]]) -> None:
+        """Initialize the watchdog with its timeout and timeout callback."""
         self._timeout_seconds = timeout_seconds
         self._on_timeout = on_timeout
         self._activity = asyncio.Event()
         self._activity.set()
 
     def notify_activity(self) -> None:
+        """Reset the tolerance window; call on every received message."""
         self._activity.set()
 
     async def run(self) -> None:
-        """Läuft, bis das Toleranzfenster ohne Lebenszeichen abläuft, und
-        ruft dann ``on_timeout`` genau einmal auf. Bei ``asyncio.CancelledError``
-        (reguläre Verbindungsbeendigung) wird sauber beendet, ohne
-        ``on_timeout`` aufzurufen.
+        """Run until the tolerance window elapses without activity, then call `on_timeout` once.
+
+        Bei ``asyncio.CancelledError`` (reguläre Verbindungsbeendigung) wird
+        sauber beendet, ohne ``on_timeout`` aufzurufen.
         """
         while True:
             self._activity.clear()
             try:
-                await asyncio.wait_for(
-                    self._activity.wait(), timeout=self._timeout_seconds
-                )
-            except asyncio.TimeoutError:
+                await asyncio.wait_for(self._activity.wait(), timeout=self._timeout_seconds)
+            except TimeoutError:
                 await self._on_timeout()
                 return

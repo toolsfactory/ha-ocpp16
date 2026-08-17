@@ -1,9 +1,8 @@
-"""Verdrahtet WebSocket-Transport, Domänenservices, Query-/CommandService und
-optional die interaktive Konsole (REQ-0032/REQ-0033) zu einem lauffähigen
-Standalone-Kern.
-"""
+"""Verdrahtet Transport, Domänenservices und die Konsole zu einem lauffähigen Kern.
 
-from __future__ import annotations
+WebSocket-Transport, Domänenservices, Query-/CommandService und optional die
+interaktive Konsole (REQ-0032/REQ-0033) zu einem lauffähigen Standalone-Kern.
+"""
 
 import asyncio
 import logging
@@ -29,7 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 class CentralSystemApp:
+    """Composition root for the standalone core: wires config into runnable domain services."""
+
     def __init__(self, config: AppConfig) -> None:
+        """Build the domain services and handler wiring from `config`."""
         self.config = config
         self.registry = ChargePointRegistryStore()
         self.connectors = ConnectorStateStore()
@@ -48,9 +50,7 @@ class CentralSystemApp:
             meter_values=self.meter_values,
             events=self.events,
         )
-        self.command_service = CommandService(
-            registry=self.registry, transactions=self.transactions
-        )
+        self.command_service = CommandService(registry=self.registry, transactions=self.transactions)
         self._handler_services = HandlerServices(
             registry=self.registry,
             connectors=self.connectors,
@@ -61,28 +61,28 @@ class CentralSystemApp:
             heartbeat_interval_seconds=config.heartbeat_interval_seconds,
             heartbeat_grace_period_seconds=config.heartbeat_grace_period_seconds,
         )
-        self._server: "Server | None" = None
+        self._server: Server | None = None
         self._console_task: asyncio.Task | None = None
 
     async def start(self) -> None:
-        """Baut den WebSocket-Server auf und bindet den Listen-Socket
-        (ADR-0008). ``websockets.serve()`` kehrt nach dem Binden zurück,
-        eingehende Verbindungen werden von der websockets-Bibliothek
-        automatisch als eigene Tasks in der aktuell laufenden Eventloop
-        eingeplant — kein zusätzliches Task-Management durch den Aufrufer
-        nötig. Muss aus einer bereits laufenden Eventloop heraus aufgerufen
-        werden."""
+        """Build the WebSocket server and bind the listen socket (ADR-0008).
+
+        ``websockets.serve()`` kehrt nach dem Binden zurück, eingehende
+        Verbindungen werden von der websockets-Bibliothek automatisch als
+        eigene Tasks in der aktuell laufenden Eventloop eingeplant -- kein
+        zusätzliches Task-Management durch den Aufrufer nötig. Muss aus
+        einer bereits laufenden Eventloop heraus aufgerufen werden.
+        """
         if self._server is not None:
-            raise RuntimeError(
-                "CentralSystemApp.start() wurde ohne vorheriges stop() erneut "
-                "aufgerufen."
-            )
+            raise RuntimeError("CentralSystemApp.start() wurde ohne vorheriges stop() erneut aufgerufen.")
         self._server = await start_server(self.config, self._handler_services)
 
     async def stop(self) -> None:
-        """Schließt den Listen-Socket und alle offenen Charge-Point-
-        Verbindungen sowie einen ggf. laufenden Konsolen-Task (ADR-0008).
-        Idempotent."""
+        """Close the listen socket, open connections and the console task. Idempotent.
+
+        Schließt den Listen-Socket und alle offenen Charge-Point-Verbindungen
+        sowie einen ggf. laufenden Konsolen-Task (ADR-0008).
+        """
         if self._console_task is not None:
             self._console_task.cancel()
             self._console_task = None
@@ -95,15 +95,19 @@ class CentralSystemApp:
         await server.wait_closed()
 
     async def run(self) -> None:
-        """NUR für den Standalone-Einstiegspunkt (``__main__.py``): baut auf
-        ``start()``/``stop()`` auf statt Server-Aufbau und blockierendes
-        Warten zu duplizieren (ADR-0008)."""
+        """Run the server until cancelled. Only for the standalone entry point (``__main__.py``).
+
+        Baut auf ``start()``/``stop()`` auf statt Server-Aufbau und
+        blockierendes Warten zu duplizieren (ADR-0008).
+        """
         await self.start()
         assert self._server is not None
 
         if sys.stdin.isatty():
-            # REQ-0032 AC4 / ADR-0002: Konsole nur bei echtem Terminal starten.
-            from custom_components.occp.core.console import run_console
+            # REQ-0032 AC4 / ADR-0002: Konsole nur bei echtem Terminal starten. Lazy
+            # import, weil run() nur der Standalone-Einstiegspunkt aufruft -- die
+            # HA-Integration lädt console.py nie.
+            from custom_components.occp.core.console import run_console  # noqa: PLC0415
 
             self._console_task = asyncio.create_task(run_console(self))
         else:

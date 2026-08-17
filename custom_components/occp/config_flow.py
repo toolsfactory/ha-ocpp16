@@ -6,12 +6,11 @@ Endpunkt, optional der Pfad zur statischen idTag-Autorisierungsliste
 (REQ-0020, siehe ``const.py``-Kommentar zu ``CONF_DEFAULT_ID_TAG``).
 """
 
-from __future__ import annotations
-
 import socket
 from typing import Any
 
 import voluptuous as vol
+
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 
 from .const import (
@@ -43,9 +42,8 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Handle the single `user` setup step."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -60,16 +58,12 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
             except OSError:
                 errors["port"] = "port_in_use"
             else:
-                return self.async_create_entry(
-                    title=f"OCCP ({host}:{port})", data=user_input
-                )
+                return self.async_create_entry(title=f"OCCP ({host}:{port})", data=user_input)
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default=DEFAULT_HOST): str,
-                vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=65535)
-                ),
+                vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
                 vol.Optional(CONF_AUTHORIZATION_FILE): str,
                 vol.Optional(CONF_DEFAULT_ID_TAG): str,
             }

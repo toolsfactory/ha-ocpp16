@@ -6,18 +6,13 @@ etwaige charge-point-weite Entities hängen direkt am Charge-Point-Device
 (siehe ``connector_device_info`` unten).
 """
 
-from __future__ import annotations
-
-from homeassistant.helpers.device_registry import DeviceInfo
-
 from custom_components.occp.core.domain.models import ChargePointSnapshot
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN
 
 
-def charge_point_device_info(
-    charge_point_id: str, snapshot: ChargePointSnapshot | None
-) -> DeviceInfo:
+def charge_point_device_info(charge_point_id: str, snapshot: ChargePointSnapshot | None) -> DeviceInfo:
     """Device-Info für den Charge Point selbst (REQ-0017 AC1)."""
     return DeviceInfo(
         identifiers={(DOMAIN, charge_point_id)},

@@ -7,45 +7,39 @@
 [![hacs][hacsbadge]][hacs]
 ![Project Maintenance][maintenance-shield]
 
-<!--
-Uncomment and customize these badges if you want to use them:
-
-[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
-[![Discord][discord-shield]][discord]
--->
-
 **✨ Develop in the cloud:** Want to contribute or customize this integration? Open it directly in GitHub Codespaces - no local setup required!
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/toolsfactory/occp-ha?quickstart=1)
 
 ## ✨ Features
 
-- **Easy Setup**: Simple configuration through the UI - no YAML required
-- **Air Quality Monitoring**: Track AQI and PM2.5 levels in real-time
-- **Filter Management**: Monitor filter life and get replacement alerts
-- **Smart Control**: Adjust fan speed, target humidity, and operating modes
-- **Child Lock**: Safety feature to prevent accidental changes
-- **Diagnostic Info**: View filter life, runtime hours, and device statistics
-- **Reconfigurable**: Change credentials anytime without removing the integration
-- **Options Flow**: Adjust settings like update interval after setup
-- **Custom Services**: Advanced control with built-in service calls
+OCCP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server that
+charge points connect to, rather than polling a cloud API.
 
-**This integration will set up the following platforms.**
+- **Easy Setup**: Configure the listen address/port through the UI - no YAML required
+- **Push-Based**: Charge points and connectors are discovered automatically as they connect - nothing
+  to pre-register
+- **Live Status**: Five-value connector state (not connected / ready / charging / unavailable /
+  error), plus the raw OCPP status and error code as attributes
+- **Energy Monitoring**: Current charging power and every measurand a charge point reports
+  (energy, voltage, current, temperature, state of charge, ...) as dynamic sensors
+- **Remote Control**: Start and stop transactions, and take a connector operative/inoperative,
+  directly from Home Assistant
+- **Power Limiting**: Set or clear a charging power limit per connector, with the effective limit
+  read back from the charge point
+- **Static Authorization**: An optional JSON allow-list of idTags a charge point may accept for
+  transactions
+- **Custom Services**: Set/clear a connector's power limit and check an idTag's authorization status
+  from automations
 
-| Platform        | Description                                              |
-| --------------- | -------------------------------------------------------- |
-| `sensor`        | Air quality index (AQI), PM2.5, filter life, and runtime |
-| `binary_sensor` | API connection status and filter replacement alert       |
-| `switch`        | Child lock and LED display controls                      |
-| `select`        | Fan speed selection (Low/Medium/High/Auto)               |
-| `number`        | Target humidity setting (30-80%)                         |
-| `button`        | Reset filter timer after replacement                     |
-| `fan`           | Air purifier fan control with speed settings             |
+**This integration sets up the following platforms.**
 
-> [!TIP]
-> **Interactive Demo:** The entities are interconnected for demonstration.
-> Press the **Reset Filter Timer** button to see **Filter Life Remaining** update to 100%.
-> Changing the **Air Purifier** fan speed syncs the **Fan Speed** select, and vice versa.
+| Platform | Description                                                                                |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `sensor` | Connector state, current charging power, effective power limit, and per-measurand readings |
+| `switch` | Start/stop a transaction, and toggle a connector operative/inoperative                     |
+
+Each charge point becomes a Home Assistant device, with every connector as its own sub-device.
 
 ## 🚀 Quick Start
 
@@ -55,7 +49,7 @@ Uncomment and customize these badges if you want to use them:
 
 Click the button below to open the integration directly in HACS:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jpawlowski&repository=occp-ha&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=toolsfactory&repository=occp-ha&category=integration)
 
 Then:
 
@@ -88,11 +82,14 @@ Click the button below to open the configuration dialog:
 
 Follow the setup wizard:
 
-1. Enter your username
-2. Enter your password
-3. Click Submit
+1. Enter the address and port the OCPP WebSocket server should listen on (defaults to
+   `0.0.0.0:9000` - reachable from every network interface)
+2. Optionally point at a JSON file with a static idTag allow-list
+3. Optionally set a default idTag to use when starting a transaction from the `start_stop` switch
+4. Click Submit
 
-That's it! The integration will start loading your data.
+Home Assistant now starts listening for charge point connections. Point your charge point's OCPP
+backend URL at `ws://<this host>:<port>/<chargePointId>`.
 
 #### Option 2: Manual Configuration
 
@@ -101,167 +98,96 @@ That's it! The integration will start loading your data.
 3. Search for "OCCP - OCPP 1.6 Central System"
 4. Follow the same setup steps as Option 1
 
-### Step 3: Adjust Settings (Optional)
+You can add more than one config entry (e.g. one listen port per site) - each runs its own
+independent WebSocket server.
 
-After setup, you can adjust options:
+### Step 3: Connect a Charge Point
 
-1. Go to **Settings** → **Devices & Services**
-2. Find **OCCP - OCPP 1.6 Central System**
-3. Click **Configure** to adjust:
-   - Update interval (how often to refresh data)
-   - Enable debug logging
-
-You can also **Reconfigure** your credentials anytime without removing the integration.
-
-### Step 4: Start Using!
-
-The integration creates several entities for your air purifier:
-
-- **Sensors**: Air quality index, PM2.5 levels, filter life remaining, total runtime
-- **Binary Sensors**: API connection status, filter replacement alert
-- **Switches**: Child lock, LED display control
-- **Select**: Fan speed (Low/Medium/High/Auto)
-- **Number**: Target humidity (30-80%)
-- **Button**: Reset filter timer
-- **Fan**: Air purifier fan control
-
-Find all entities in **Settings** → **Devices & Services** → **OCCP - OCPP 1.6 Central System** → click on the device.
+Devices and entities appear automatically the moment a charge point connects and sends its first
+`BootNotification` - there is nothing to register manually. Find them in **Settings** → **Devices &
+Services** → **OCCP - OCPP 1.6 Central System**.
 
 ## Available Entities
 
+Entities are created per connector as soon as a charge point reports it (connector 0, the charge
+point as a whole, never gets its own entities).
+
 ### Sensors
 
-- **Air Quality Index (AQI)**: Real-time air quality measurement (0-500 scale)
-  - Includes air quality category (Good/Moderate/Unhealthy/etc.)
-  - Health recommendations based on current AQI
-- **PM2.5**: Fine particulate matter concentration in µg/m³
-- **Filter Life Remaining** (Diagnostic): Shows remaining filter life as percentage
-- **Total Runtime** (Diagnostic): Total operating hours of the device
-
-### Binary Sensors
-
-- **API Connection**: Shows whether the connection to the API is active
-  - On: Connected and receiving data
-  - Off: Connection lost or authentication failed
-  - Shows update interval and API endpoint information
-- **Filter Replacement Needed**: Alerts when filter needs replacement
-  - Shows estimated days remaining
-  - Turns on when filter life is low
+- **Charge Point State**: Five-value connector state (`not_connected`, `ready`, `charging`,
+  `unavailable`, `error`), with the raw OCPP status, error code, and supported capabilities as
+  attributes
+- **Current Power**: The connector's current charging power in watts, from the
+  `Power.Active.Import` measurand
+- **Effective Power Limit**: The power limit currently in effect, read back from the charge point
+  via `GetCompositeSchedule`
+- **Measurand sensors**: One dynamic sensor per measurand a charge point actually reports (energy,
+  voltage, current, temperature, state of charge, ...), split by phase where the charge point
+  reports one
 
 ### Switches
 
-- **Child Lock**: Prevents accidental button presses on the device
-  - Icon changes based on state (locked/unlocked)
-- **LED Display**: Enable/disable the LED display
-  - Disabled by default - enable in entity settings if needed
-
-### Select
-
-- **Fan Speed**: Choose from Low, Medium, High, or Auto
-  - Icon changes dynamically based on selected speed
-  - Auto mode adjusts speed based on air quality
-  - Syncs bidirectionally with the Air Purifier fan entity
-
-### Number
-
-- **Target Humidity**: Set desired humidity level (30-80%)
-  - Adjustable in 5% increments
-  - Displayed as a slider in the UI
-
-### Button
-
-- **Reset Filter Timer**: Reset the filter life to 100%
-  - Press to reset after replacing the filter
-  - Instantly updates the Filter Life Remaining sensor
-
-### Fan
-
-- **Air Purifier**: Control the air purifier fan speed and power
-  - Three speed levels: Low, Medium, High
-  - Syncs bidirectionally with the Fan Speed select entity
-  - Turn on/off functionality
+- **Start/Stop**: Remote-starts a transaction using the config entry's default idTag, or stops the
+  connector's active transaction
+- **Availability**: Sets the connector operative or inoperative. A pending ("Scheduled") change is
+  not reflected until the charge point confirms it with a status update
 
 ## Custom Services
 
-The integration provides services for advanced automation:
+### `occp.set_power_limit`
 
-### `occp.example_action`
-
-Perform a custom action (customize this for your needs).
-
-**Example:**
+Set a connector's charging power limit.
 
 ```yaml
-service: occp.example_action
+service: occp.set_power_limit
 data:
-  # Add your parameters here
+  device_id: <connector device id>
+  limit_w: 7400
+  phases: 3 # optional
 ```
 
-### `occp.reload_data`
+### `occp.clear_power_limit`
 
-Manually refresh data from the API without waiting for the update interval.
-
-**Example:**
+Remove a connector's charging power limit.
 
 ```yaml
-service: occp.reload_data
+service: occp.clear_power_limit
+data:
+  device_id: <connector device id>
 ```
 
-Use these services in automations or scripts for more control.
+### `occp.authorize_id_token`
+
+Check whether an idTag is authorized, without starting a transaction.
+
+```yaml
+service: occp.authorize_id_token
+data:
+  charge_point_id: CP001
+  id_token: TAG001
+```
 
 ## Configuration Options
 
 ### During Setup
 
-| Name     | Required | Description           |
-| -------- | -------- | --------------------- |
-| Username | Yes      | Your account username |
-| Password | Yes      | Your account password |
+| Name               | Required | Description                                                      |
+| ------------------ | -------- | ---------------------------------------------------------------- |
+| Host               | Yes      | Address the OCPP WebSocket server listens on (default `0.0.0.0`) |
+| Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)       |
+| Authorization File | No       | Path to a JSON file with a static idTag allow-list               |
+| Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command     |
 
-### After Setup (Options)
-
-You can change these anytime by clicking **Configure**:
-
-| Name             | Default | Description                |
-| ---------------- | ------- | -------------------------- |
-| Update Interval  | 1 hour  | How often to refresh data  |
-| Enable Debugging | Off     | Enable extra debug logging |
+Settings cannot currently be changed after setup - remove and re-add the integration to change them.
 
 ## Troubleshooting
 
-### Authentication Issues
+### Charge point does not appear
 
-#### Reauthentication
-
-If your credentials expire or change, Home Assistant will automatically prompt you to reauthenticate:
-
-1. Go to **Settings** → **Devices & Services**
-2. Look for **"Action Required"** or **"Configuration Required"** message on the integration
-3. Click **"Reconfigure"** or follow the prompt
-4. Enter your updated credentials
-5. Click Submit
-
-The integration will automatically resume normal operation with the new credentials.
-
-#### Manual Credential Update
-
-You can also update credentials at any time without waiting for an error:
-
-1. Go to **Settings** → **Devices & Services**
-2. Find **OCCP - OCPP 1.6 Central System**
-3. Click the **3 dots menu** → **Reconfigure**
-4. Enter new username/password
-5. Click Submit
-
-#### Connection Status
-
-Monitor your connection status with the **API Connection** binary sensor:
-
-- **On** (Connected): Integration is receiving data normally
-- **Off** (Disconnected): Connection lost or authentication failed
-  - Check the binary sensor attributes for diagnostic information
-  - Verify credentials if authentication failed
-  - Check network connectivity
+- Confirm the charge point's configured OCPP backend URL matches
+  `ws://<host>:<port>/<chargePointId>` and uses subprotocol `ocpp1.6`
+- Check that nothing else on the network is already bound to the configured port
+- Check the Home Assistant log for connection attempts and rejected connections
 
 ### Enable Debug Logging
 
@@ -273,26 +199,6 @@ logger:
   logs:
     custom_components.occp: debug
 ```
-
-### Common Issues
-
-#### Authentication Errors
-
-If you receive authentication errors:
-
-1. Verify your username and password are correct
-2. Check that your account has the necessary permissions
-3. Wait for the automatic reauthentication prompt, or manually reconfigure
-4. Check the API Connection binary sensor for status
-
-#### Device Not Responding
-
-If your device is not responding:
-
-1. Check the **API Connection** binary sensor - it should be "On"
-2. Check your network connection
-3. Verify the device is powered on
-4. Check the integration diagnostics (Settings → Devices & Services → OCCP - OCPP 1.6 Central System → 3 dots → Download diagnostics)
 
 ## 🤝 Contributing
 
@@ -383,22 +289,24 @@ You'll need these installed locally:
 ## 🤖 AI-Assisted Development
 
 > [!NOTE]
-> **Transparency Notice:** This integration was developed with assistance from AI coding agents (GitHub Copilot,
-> Claude, and others). AI assistance by itself neither guarantees nor rules out software quality. To make an informed
-> installation decision, review the project's stated maturity, known limitations, automated test coverage, real-device
-> testing, and the extent of human review. The maintainer should replace the fields below with accurate project-specific
-> details rather than implying checks that were not performed. See the blueprint's [`AI_POLICY.md`](AI_POLICY.md) for
-> guidance.
+> **Transparency Notice:** This integration was developed with assistance from AI coding agents. AI
+> assistance by itself neither guarantees nor rules out software quality. See the project's
+> [`AI_POLICY.md`](AI_POLICY.md) for the policy this section follows.
 >
-> - **AI assistance:** limited / substantial / predominant
-> - **Human review:** complete / partial / spot-checked / not performed
-> - **Automated tests:** [describe or state "not performed"]
-> - **Real-device or service testing:** [describe or state "not performed"]
-> - **Maturity and known limitations:** [describe]
+> - **AI assistance:** substantial — the Home Assistant integration layer around the existing OCPP
+>   1.6 core was built, reviewed, and debugged largely by AI agents under the maintainer's direction
+> - **Human review:** partial — the maintainer directed the work and reviewed it at a high level;
+>   line-by-line review of every change has not been performed
+> - **Automated tests:** a minimal `pytest-homeassistant-custom-component` setup/unload smoke test
+>   exists; the OCPP core's own test suite is not yet part of this repository
+> - **Real-device or service testing:** exercised end-to-end against an OCPP 1.6 charge point
+>   simulator ([shiv3/ocpp-cp-simulator](https://github.com/shiv3/ocpp-cp-simulator)), not yet
+>   against physical charging hardware
+> - **Maturity and known limitations:** pre-1.0, actively evolving. `Reset`, `UnlockConnector`,
+>   `GetConfiguration`, and `ChangeConfiguration` are implemented in the core but not yet exposed as
+>   Home Assistant services. No options/reconfigure flow yet.
 >
 > If you encounter unexpected behavior, please [open an issue](../../issues) on GitHub.
->
-> _This section can be removed or modified if AI assistance was not used in your integration's development._
 
 ---
 
@@ -420,11 +328,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [maintenance-shield]: https://img.shields.io/badge/maintainer-%40toolsfactory-blue.svg?style=for-the-badge
 [releases-shield]: https://img.shields.io/github/release/toolsfactory/occp-ha.svg?style=for-the-badge
 [releases]: https://github.com/toolsfactory/occp-ha/releases
-[user_profile]: https://github.com/jpawlowski
-
-<!-- Optional badge definitions - uncomment if needed:
-[buymecoffee]: https://www.buymeacoffee.com/jpawlowski
-[buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
-[discord]: https://discord.gg/Qa5fW2R
-[discord-shield]: https://img.shields.io/discord/330944238910963714.svg?style=for-the-badge
--->
+[user_profile]: https://github.com/toolsfactory
