@@ -7,15 +7,13 @@ Start/Stop (REQ-0020) und Verfügbarkeit = Fähigkeit 6 des Interop-Vertrags
 from typing import Any
 
 from custom_components.occp.core.domain.commands import CommandError
-from custom_components.occp.core.domain.models import ConnectionStatus, QueryService
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import OccpCoordinator
-from .device import connector_device_info
+from .entity import OccpConnectorEntity
 from .runtime import OccpConfigEntry, OccpEntryData
 
 # Jede Aktion löst einen Central-System-initiierten WebSocket-Aufruf an den
@@ -86,34 +84,8 @@ class _SwitchManager:
             self.async_add_entities(new_entities)
 
 
-def _is_charge_point_online(query_service: QueryService, charge_point_id: str) -> bool:
-    for cp in query_service.get_charge_points():
-        if cp.charge_point_id == charge_point_id:
-            return cp.connection_status == ConnectionStatus.ONLINE
-    return False
-
-
-class _OccpConnectorSwitchBase(CoordinatorEntity[OccpCoordinator], SwitchEntity):
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator: OccpCoordinator,
-        entry_data: OccpEntryData,
-        charge_point_id: str,
-        connector_id: int,
-        entity_key: str,
-    ) -> None:
-        super().__init__(coordinator)
-        self._entry_data = entry_data
-        self._charge_point_id = charge_point_id
-        self._connector_id = connector_id
-        self._attr_unique_id = f"{charge_point_id}_{connector_id}_{entity_key}"
-        self._attr_device_info = connector_device_info(charge_point_id, connector_id)
-
-    @property
-    def available(self) -> bool:
-        return super().available and _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
+class _OccpConnectorSwitchBase(OccpConnectorEntity, SwitchEntity):
+    """Gemeinsame Basis aller connectorbezogenen Switch-Entities."""
 
 
 class OccpStartStopSwitch(_OccpConnectorSwitchBase):

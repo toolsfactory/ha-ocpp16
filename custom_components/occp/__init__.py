@@ -22,7 +22,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
 from .coordinator import OccpCoordinator
-from .device import charge_point_device_info
+from .entity_utils.device import charge_point_device_info
 from .runtime import OccpConfigEntry, OccpEntryData
 from .services import async_register_services, async_unregister_services
 

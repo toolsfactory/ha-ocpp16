@@ -11,7 +11,7 @@ ihren eigenen Ausschnitt frisch aus ``QueryService``/``CommandService``).
 import logging
 from typing import TYPE_CHECKING, Any
 
-from custom_components.occp.core.domain.models import ConnectionStatus, MeterSample, QueryService
+from custom_components.occp.core.domain.models import MeterSample
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import (
     PERCENTAGE,
@@ -23,12 +23,11 @@ from homeassistant.const import (
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import interop
 from .const import RAW_STATUS_TO_STATE, STATE_ERROR, SUPPORTED_CAPABILITIES, SUPPORTED_PHASES
 from .coordinator import OccpCoordinator
-from .device import connector_device_info
+from .entity import OccpConnectorEntity
 from .runtime import OccpConfigEntry, OccpEntryData
 
 _LOGGER = logging.getLogger(__name__)
@@ -158,43 +157,8 @@ class _SensorManager:
         return new_sensors
 
 
-def _is_charge_point_online(query_service: QueryService, charge_point_id: str) -> bool:
-    snapshot = query_service.get_charge_points()
-    for cp in snapshot:
-        if cp.charge_point_id == charge_point_id:
-            return cp.connection_status == ConnectionStatus.ONLINE
-    return False
-
-
-class _OccpConnectorSensorBase(CoordinatorEntity[OccpCoordinator], SensorEntity):
-    """Gemeinsame Basis aller connectorbezogenen Sensor-Entities.
-
-    Push-only (``iot_class: local_push``): ``CoordinatorEntity`` verdrahtet
-    Lifecycle/Update-Listener automatisch; jede Instanz liest bei jedem
-    Coordinator-Update ihren Ausschnitt frisch aus
-    ``QueryService``/``CommandService`` (ADR-0008 Abschnitt 2).
-    """
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator: OccpCoordinator,
-        entry_data: OccpEntryData,
-        charge_point_id: str,
-        connector_id: int,
-        entity_key: str,
-    ) -> None:
-        super().__init__(coordinator)
-        self._entry_data = entry_data
-        self._charge_point_id = charge_point_id
-        self._connector_id = connector_id
-        self._attr_unique_id = f"{charge_point_id}_{connector_id}_{entity_key}"
-        self._attr_device_info = connector_device_info(charge_point_id, connector_id)
-
-    @property
-    def available(self) -> bool:
-        return super().available and _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
+class _OccpConnectorSensorBase(OccpConnectorEntity, SensorEntity):
+    """Gemeinsame Basis aller connectorbezogenen Sensor-Entities."""
 
 
 class OccpCurrentPowerSensor(_OccpConnectorSensorBase):

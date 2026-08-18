@@ -35,7 +35,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from . import interop
 from .const import DOMAIN
-from .device import parse_connector_identifier
+from .entity_utils.device import parse_connector_identifier
 from .runtime import OccpEntryData
 
 SERVICE_SET_POWER_LIMIT = "set_power_limit"
