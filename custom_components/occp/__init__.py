@@ -24,7 +24,7 @@ from .const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF
 from .coordinator import OccpCoordinator
 from .entity_utils.device import charge_point_device_info
 from .runtime import OccpConfigEntry, OccpEntryData
-from .services import async_register_services, async_unregister_services
+from .service_actions import async_register_services, async_unregister_services
 
 _LOGGER = logging.getLogger(__name__)
 
