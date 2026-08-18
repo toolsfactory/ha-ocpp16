@@ -7,67 +7,58 @@ Start/Stop (REQ-0020) und Verfügbarkeit = Fähigkeit 6 des Interop-Vertrags
 from typing import Any
 
 from custom_components.occp.core.domain.commands import CommandError
-from custom_components.occp.core.domain.models import ConnectionStatus, QueryService, StateChangeEvent
+from custom_components.occp.core.domain.models import ConnectionStatus, QueryService
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import signal_new_charge_point, signal_state_update
+from .coordinator import OccpCoordinator
 from .device import connector_device_info
 from .runtime import OccpConfigEntry, OccpEntryData
+
+# Jede Aktion löst einen Central-System-initiierten WebSocket-Aufruf an den
+# Charge Point aus -- python-ocpps eigener _call_lock serialisiert diese pro
+# Verbindung ohnehin, PARALLEL_UPDATES = 1 spiegelt das auf HA-Seite.
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: OccpConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up switch entities for a config entry."""
-    manager = _SwitchManager(hass, entry.entry_id, entry.runtime_data, async_add_entities)
-    manager.async_setup()
+    manager = _SwitchManager(entry.runtime_data, async_add_entities)
+    entry.async_on_unload(manager.async_setup())
 
 
 class _SwitchManager:
     """Analog ``sensor._SensorManager``.
 
     Legt Switch-Entities dynamisch je Connector an, sobald ein Charge Point
-    erstmals bekannt wird.
+    erstmals bekannt wird. Reagiert auf ``OccpCoordinator``-Updates statt
+    eigener Dispatcher-Signale.
     """
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        entry_id: str,
-        entry_data: OccpEntryData,
-        async_add_entities: AddEntitiesCallback,
-    ) -> None:
-        self.hass = hass
-        self.entry_id = entry_id
+    def __init__(self, entry_data: OccpEntryData, async_add_entities: AddEntitiesCallback) -> None:
         self.entry_data = entry_data
+        self.coordinator = entry_data.coordinator
         self.async_add_entities = async_add_entities
         self._known_connectors: set[tuple[str, int]] = set()
-        self._known_charge_points: set[str] = set()
 
-    def async_setup(self) -> None:
-        async_dispatcher_connect(self.hass, signal_new_charge_point(self.entry_id), self._async_add_charge_point)
+    def async_setup(self) -> CALLBACK_TYPE:
+        """Start listening and sync already-known charge points. Returns the coordinator unsubscribe callable."""
+        remove_listener = self.coordinator.async_add_listener(self._handle_coordinator_update)
         for snapshot in self.entry_data.app.query_service.get_charge_points():
-            self._async_add_charge_point(snapshot.charge_point_id)
+            self._sync_connectors(snapshot.charge_point_id)
+        return remove_listener
 
     @callback
-    def _async_add_charge_point(self, charge_point_id: str) -> None:
-        if charge_point_id in self._known_charge_points:
+    def _handle_coordinator_update(self) -> None:
+        event = self.coordinator.data
+        if event is None:
             return
-        self._known_charge_points.add(charge_point_id)
-        async_dispatcher_connect(
-            self.hass,
-            signal_state_update(self.entry_id, charge_point_id),
-            callback(lambda event: self._handle_event(charge_point_id, event)),
-        )
-        self._sync_connectors(charge_point_id)
-
-    @callback
-    def _handle_event(self, charge_point_id: str, event: StateChangeEvent) -> None:
-        self._sync_connectors(charge_point_id, only_connector_id=event.connector_id)
+        self._sync_connectors(event.charge_point_id, only_connector_id=event.connector_id)
 
     def _sync_connectors(self, charge_point_id: str, only_connector_id: int | None = None) -> None:
         query_service = self.entry_data.app.query_service
@@ -87,8 +78,8 @@ class _SwitchManager:
             self._known_connectors.add(key)
             new_entities.extend(
                 [
-                    OccpStartStopSwitch(self.entry_id, self.entry_data, charge_point_id, connector_id),
-                    OccpAvailabilitySwitch(self.entry_id, self.entry_data, charge_point_id, connector_id),
+                    OccpStartStopSwitch(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                    OccpAvailabilitySwitch(self.coordinator, self.entry_data, charge_point_id, connector_id),
                 ]
             )
         if new_entities:
@@ -102,40 +93,27 @@ def _is_charge_point_online(query_service: QueryService, charge_point_id: str) -
     return False
 
 
-class _OccpConnectorSwitchBase(SwitchEntity):
-    _attr_should_poll = False
+class _OccpConnectorSwitchBase(CoordinatorEntity[OccpCoordinator], SwitchEntity):
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        entry_id: str,
+        coordinator: OccpCoordinator,
         entry_data: OccpEntryData,
         charge_point_id: str,
         connector_id: int,
         entity_key: str,
     ) -> None:
-        self._entry_id = entry_id
+        super().__init__(coordinator)
         self._entry_data = entry_data
         self._charge_point_id = charge_point_id
         self._connector_id = connector_id
         self._attr_unique_id = f"{charge_point_id}_{connector_id}_{entity_key}"
         self._attr_device_info = connector_device_info(charge_point_id, connector_id)
 
-    async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                signal_state_update(self._entry_id, self._charge_point_id),
-                self._async_handle_event,
-            )
-        )
-
-    async def _async_handle_event(self, event: StateChangeEvent) -> None:
-        self.async_write_ha_state()
-
     @property
     def available(self) -> bool:
-        return _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
+        return super().available and _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
 
 
 class OccpStartStopSwitch(_OccpConnectorSwitchBase):
@@ -146,9 +124,11 @@ class OccpStartStopSwitch(_OccpConnectorSwitchBase):
 
     _attr_translation_key = "start_stop"
 
-    def __init__(self, entry_id: str, entry_data: OccpEntryData, charge_point_id: str, connector_id: int) -> None:
+    def __init__(
+        self, coordinator: OccpCoordinator, entry_data: OccpEntryData, charge_point_id: str, connector_id: int
+    ) -> None:
         """Initialize the entity for the given charge point connector."""
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, "start_stop")
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, "start_stop")
 
     @property
     def is_on(self) -> bool:
@@ -196,9 +176,11 @@ class OccpAvailabilitySwitch(_OccpConnectorSwitchBase):
 
     _attr_translation_key = "availability"
 
-    def __init__(self, entry_id: str, entry_data: OccpEntryData, charge_point_id: str, connector_id: int) -> None:
+    def __init__(
+        self, coordinator: OccpCoordinator, entry_data: OccpEntryData, charge_point_id: str, connector_id: int
+    ) -> None:
         """Initialize the entity for the given charge point connector."""
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, "availability")
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, "availability")
         self._last_change_status: str | None = None
 
     @property

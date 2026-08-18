@@ -25,23 +25,6 @@ CONF_DEFAULT_ID_TAG = "default_id_tag"
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 9000
 
-# -- Dispatcher-Signale (ADR-0008 Abschnitt 2) -------------------------------
-
-
-def signal_state_update(entry_id: str, charge_point_id: str) -> str:
-    """Signalname für Zustandsänderungen eines einzelnen Charge Points."""
-    return f"{DOMAIN}_{entry_id}_{charge_point_id}"
-
-
-def signal_new_charge_point(entry_id: str) -> str:
-    """Signalname, wenn ein bisher unbekannter Charge Point erstmals eine ``StateChangeEvent`` auslöst.
-
-    Grundlage für dynamische Entity-Anlage (REQ-0017 AC1), da ADR-0008
-    selbst keine Aussage zum Erstanlage-Zeitpunkt trifft.
-    """
-    return f"{DOMAIN}_{entry_id}_new_charge_point"
-
-
 # -- Fähigkeit-7-Discovery-Bitmask (ADR-0010) --------------------------------
 CAP_BIT_CURRENT_POWER = 1  # Fähigkeit 1
 CAP_BIT_STATE = 2  # Fähigkeit 2

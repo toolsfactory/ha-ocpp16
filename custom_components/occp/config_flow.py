@@ -1,17 +1,23 @@
 """Config Flow für OCCP (REQ-0016, REQ-0022, ADR-0008 Abschnitt 4).
 
-Einstufiger ``user``-Schritt: Listen-Adresse/-Port für den WebSocket-
-Endpunkt, optional der Pfad zur statischen idTag-Autorisierungsliste
-(REQ-0005) und ein für RemoteStartTransaction fest konfiguriertes idTag
-(REQ-0020, siehe ``const.py``-Kommentar zu ``CONF_DEFAULT_ID_TAG``).
+Einstufiger ``user``-Schritt: Listen-Adresse/-Port für den WebSocket-Endpunkt
+landen in ``entry.data`` (für den Verbindungsaufbau nötig). Der optionale
+Pfad zur statischen idTag-Autorisierungsliste (REQ-0005) und ein für
+RemoteStartTransaction fest konfiguriertes idTag (REQ-0020) landen in
+``entry.options`` -- beides über den Options-Flow nachträglich änderbar, ohne
+den Entry neu anzulegen. ``unique_id`` ist eine zufällige UUID (Host/Port
+sind laut Projektregel keine zulässige unique_id-Quelle); ein Duplikat mit
+derselben Host/Port-Kombination wird stattdessen explizit über
+``_host_port_already_configured`` abgefangen.
 """
 
 import socket
 from typing import Any
+from uuid import uuid4
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 
 from .const import (
     CONF_AUTHORIZATION_FILE,
@@ -21,6 +27,13 @@ from .const import (
     DEFAULT_HOST,
     DEFAULT_PORT,
     DOMAIN,
+)
+
+_OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_AUTHORIZATION_FILE): str,
+        vol.Optional(CONF_DEFAULT_ID_TAG): str,
+    }
 )
 
 
@@ -41,6 +54,7 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config Flow für das OCCP Central System."""
 
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the single `user` setup step."""
@@ -50,22 +64,58 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
             host = user_input[CONF_HOST]
             port = user_input[CONF_PORT]
 
-            await self.async_set_unique_id(f"{host}:{port}")
-            self._abort_if_unique_id_configured()
+            if self._host_port_already_configured(host, port):
+                return self.async_abort(reason="already_configured")
 
             try:
                 await self.hass.async_add_executor_job(_try_bind_port, host, port)
             except OSError:
                 errors["port"] = "port_in_use"
             else:
-                return self.async_create_entry(title=f"OCCP ({host}:{port})", data=user_input)
+                await self.async_set_unique_id(str(uuid4()))
+                return self.async_create_entry(
+                    title=f"OCCP ({host}:{port})",
+                    data={CONF_HOST: host, CONF_PORT: port},
+                    options={
+                        CONF_AUTHORIZATION_FILE: user_input.get(CONF_AUTHORIZATION_FILE, ""),
+                        CONF_DEFAULT_ID_TAG: user_input.get(CONF_DEFAULT_ID_TAG, ""),
+                    },
+                )
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_HOST, default=DEFAULT_HOST): str,
                 vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                vol.Optional(CONF_AUTHORIZATION_FILE): str,
-                vol.Optional(CONF_DEFAULT_ID_TAG): str,
             }
-        )
+        ).extend(_OPTIONS_SCHEMA.schema)
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    def _host_port_already_configured(self, host: str, port: int) -> bool:
+        """Return whether another entry already binds the same host/port.
+
+        Ersetzt den früheren ``_abort_if_unique_id_configured()``-Duplikatscheck,
+        der auf Host:Port als ``unique_id`` beruhte -- seit ``unique_id`` eine
+        zufällige UUID ist (Projektregel: nie Host/Port als unique_id), muss
+        das Duplikat explizit über die Entry-Daten geprüft werden.
+        """
+        return any(
+            entry.data.get(CONF_HOST) == host and entry.data.get(CONF_PORT) == port
+            for entry in self._async_current_entries(include_ignore=False)
+        )
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Return the options flow handler for this config entry."""
+        return OccpOptionsFlow()
+
+
+class OccpOptionsFlow(OptionsFlow):
+    """Options Flow: idTag-Autorisierungsliste und Default-idTag nachträglich ändern."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Handle the single options step."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        schema = self.add_suggested_values_to_schema(_OPTIONS_SCHEMA, self.config_entry.options)
+        return self.async_show_form(step_id="init", data_schema=schema)

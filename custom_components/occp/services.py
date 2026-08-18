@@ -1,19 +1,29 @@
-"""HA-Services für die Interop-Vertrag-Fähigkeiten 3, 4, 8 (REQ-0035, ADR-0010).
+"""HA-Services für die Interop-Vertrag-Fähigkeiten 3, 4, 8 (REQ-0035, ADR-0010) plus reset/unlock_connector/get_configuration/change_configuration.
 
-Fähigkeit 3/4 (``set_power_limit``/``clear_power_limit``) sind
-Device-targeted Services (Ziel-Connector über die HA-Device-Registry, siehe
-``device.py``); Fähigkeit 8 (``authorize_id_token``) trägt ``charge_point_id``
-bereits als Vertrags-Pflichtfeld.
+Die letzten vier waren im Kern (``CommandService``, ``core/domain/commands.py``)
+und in der Standalone-Konsole (``core/console.py``) bereits vorhanden, aber nie
+als HA-Service exponiert -- kein REQ-0035-Vertragsbestandteil, sondern eine in
+dieser Session nachgezogene Scope-Entscheidung des Entwicklers.
+
+Fähigkeit 3/4 (``set_power_limit``/``clear_power_limit``) sowie
+``unlock_connector`` sind Device-targeted Services (Ziel-Connector über die
+HA-Device-Registry, siehe ``device.py``); ``reset``/``get_configuration``/
+``change_configuration`` zielen auf das Charge-Point-Gerät selbst (nicht auf
+einen Connector); Fähigkeit 8 (``authorize_id_token``) trägt
+``charge_point_id`` bereits als Vertrags-Pflichtfeld.
 
 REQ-0035 AC7 ("unbekannter/nicht verbundener Ladepunkt -> erkennbare
-Fehlerantwort, keine Exception ohne strukturierte Rückmeldung"): alle drei
-Handler werfen dafür ``homeassistant.exceptions.ServiceValidationError`` --
-laut ADR-0010 die in Home Assistant vorgesehene, strukturierte Fehlerform für
-ungültige Aufrufparameter (HA stellt sie strukturiert im Frontend/
+Fehlerantwort, keine Exception ohne strukturierte Rückmeldung"), analog auch
+für die vier neuen Services angewendet: alle Handler werfen dafür
+``homeassistant.exceptions.ServiceValidationError`` -- laut ADR-0010 die in
+Home Assistant vorgesehene, strukturierte Fehlerform für ungültige
+Aufrufparameter (HA stellt sie strukturiert im Frontend/
 ``supports_response``-Ergebnis dar).
 """
 
+from collections.abc import Callable, Coroutine
 import functools
+from typing import Any
 
 import voluptuous as vol
 
@@ -31,11 +41,19 @@ from .runtime import OccpEntryData
 SERVICE_SET_POWER_LIMIT = "set_power_limit"
 SERVICE_CLEAR_POWER_LIMIT = "clear_power_limit"
 SERVICE_AUTHORIZE_ID_TOKEN = "authorize_id_token"
+SERVICE_RESET = "reset"
+SERVICE_UNLOCK_CONNECTOR = "unlock_connector"
+SERVICE_GET_CONFIGURATION = "get_configuration"
+SERVICE_CHANGE_CONFIGURATION = "change_configuration"
 
 ATTR_LIMIT_W = "limit_w"
 ATTR_PHASES = "phases"
 ATTR_CHARGE_POINT_ID = "charge_point_id"
 ATTR_ID_TOKEN = "id_token"
+ATTR_RESET_TYPE = "reset_type"
+ATTR_KEYS = "keys"
+ATTR_KEY = "key"
+ATTR_VALUE = "value"
 
 _SET_POWER_LIMIT_SCHEMA = vol.Schema(
     {
@@ -51,6 +69,30 @@ _AUTHORIZE_ID_TOKEN_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CHARGE_POINT_ID): cv.string,
         vol.Required(ATTR_ID_TOKEN): cv.string,
+    }
+)
+
+_RESET_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Required(ATTR_RESET_TYPE): vol.In(["Soft", "Hard"]),
+    }
+)
+
+_UNLOCK_CONNECTOR_SCHEMA = vol.Schema({vol.Required(ATTR_DEVICE_ID): cv.string})
+
+_GET_CONFIGURATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Optional(ATTR_KEYS): vol.All(cv.ensure_list, [cv.string]),
+    }
+)
+
+_CHANGE_CONFIGURATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_DEVICE_ID): cv.string,
+        vol.Required(ATTR_KEY): cv.string,
+        vol.Required(ATTR_VALUE): cv.string,
     }
 )
 
@@ -73,6 +115,26 @@ def _resolve_single_connector_device(hass: HomeAssistant, call: ServiceCall) -> 
         f"Gerät '{device_id}' ist kein OCCP-Connector (sondern z. B. die "
         "Ladestation selbst) -- dieser Service benötigt ein Connector-Gerät."
     )
+
+
+def _resolve_charge_point_device(hass: HomeAssistant, call: ServiceCall) -> str:
+    """Resolve `call.data[ATTR_DEVICE_ID]` to a charge_point_id, rejecting a connector device."""
+    device_id: str = call.data[ATTR_DEVICE_ID]
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get(device_id)
+    if device_entry is None:
+        raise ServiceValidationError(f"Unbekanntes Gerät '{device_id}'.")
+
+    for domain, identifier in device_entry.identifiers:
+        if domain != DOMAIN:
+            continue
+        if parse_connector_identifier(identifier) is not None:
+            raise ServiceValidationError(
+                f"Gerät '{device_id}' ist ein Connector -- dieser Service benötigt das Charge-Point-Gerät selbst."
+            )
+        return identifier
+
+    raise ServiceValidationError(f"Gerät '{device_id}' gehört nicht zu OCCP.")
 
 
 def _find_entry_data(hass: HomeAssistant, charge_point_id: str) -> OccpEntryData | None:
@@ -119,8 +181,74 @@ async def _handle_authorize_id_token(hass: HomeAssistant, call: ServiceCall) -> 
     return interop.authorize_id_token(entry_data.app.authorization, call.data[ATTR_ID_TOKEN])
 
 
+async def _handle_reset(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    charge_point_id = _resolve_charge_point_device(hass, call)
+    entry_data = _find_entry_data(hass, charge_point_id)
+    if entry_data is None:
+        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    try:
+        result = await entry_data.app.command_service.reset(charge_point_id, call.data[ATTR_RESET_TYPE])
+    except CommandError as err:
+        raise ServiceValidationError(str(err)) from err
+    return {"accepted": result.accepted}
+
+
+async def _handle_unlock_connector(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    charge_point_id, connector_id = _resolve_single_connector_device(hass, call)
+    entry_data = _find_entry_data(hass, charge_point_id)
+    if entry_data is None:
+        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    try:
+        result = await entry_data.app.command_service.unlock_connector(charge_point_id, connector_id)
+    except CommandError as err:
+        raise ServiceValidationError(str(err)) from err
+    return {"status": result.status}
+
+
+async def _handle_get_configuration(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    charge_point_id = _resolve_charge_point_device(hass, call)
+    entry_data = _find_entry_data(hass, charge_point_id)
+    if entry_data is None:
+        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    try:
+        result = await entry_data.app.command_service.get_configuration(charge_point_id, call.data.get(ATTR_KEYS))
+    except CommandError as err:
+        raise ServiceValidationError(str(err)) from err
+    return {
+        "entries": [{"key": entry.key, "value": entry.value, "readonly": entry.readonly} for entry in result.entries],
+        "unknown_keys": list(result.unknown_keys),
+    }
+
+
+async def _handle_change_configuration(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    charge_point_id = _resolve_charge_point_device(hass, call)
+    entry_data = _find_entry_data(hass, charge_point_id)
+    if entry_data is None:
+        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    try:
+        result = await entry_data.app.command_service.change_configuration(
+            charge_point_id, call.data[ATTR_KEY], call.data[ATTR_VALUE]
+        )
+    except CommandError as err:
+        raise ServiceValidationError(str(err)) from err
+    return {"status": result.status}
+
+
+_ServiceHandler = Callable[[HomeAssistant, ServiceCall], Coroutine[Any, Any, ServiceResponse]]
+
+_SERVICES: tuple[tuple[str, vol.Schema, _ServiceHandler], ...] = (
+    (SERVICE_SET_POWER_LIMIT, _SET_POWER_LIMIT_SCHEMA, _handle_set_power_limit),
+    (SERVICE_CLEAR_POWER_LIMIT, _CLEAR_POWER_LIMIT_SCHEMA, _handle_clear_power_limit),
+    (SERVICE_AUTHORIZE_ID_TOKEN, _AUTHORIZE_ID_TOKEN_SCHEMA, _handle_authorize_id_token),
+    (SERVICE_RESET, _RESET_SCHEMA, _handle_reset),
+    (SERVICE_UNLOCK_CONNECTOR, _UNLOCK_CONNECTOR_SCHEMA, _handle_unlock_connector),
+    (SERVICE_GET_CONFIGURATION, _GET_CONFIGURATION_SCHEMA, _handle_get_configuration),
+    (SERVICE_CHANGE_CONFIGURATION, _CHANGE_CONFIGURATION_SCHEMA, _handle_change_configuration),
+)
+
+
 def async_register_services(hass: HomeAssistant) -> None:
-    """Registriert die drei REQ-0035-Services genau einmal.
+    """Registriert alle OCCP-Services genau einmal.
 
     Unabhängig von der Anzahl der Config Entries (Services sind Domain-,
     nicht Entry-gebunden, siehe interop-contract.md "Service-Domain-Konvention").
@@ -128,33 +256,20 @@ def async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_SET_POWER_LIMIT):
         return
 
-    # functools.partial statt lambda: HA erkennt den Service-Handler nur dann
-    # korrekt als Coroutine-Funktion (und awaitet ihn selbst, statt eine
-    # nie awaitete Coroutine zurückzubekommen), wenn `asyncio.iscoroutinefunction`
-    # darauf zutrifft -- eine Lambda, die intern eine Coroutine zurückgibt,
-    # ist selbst KEINE Coroutine-Funktion; ein `partial` einer `async def`
-    # bleibt hingegen als solche erkennbar.
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SET_POWER_LIMIT,
-        functools.partial(_handle_set_power_limit, hass),
-        schema=_SET_POWER_LIMIT_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_CLEAR_POWER_LIMIT,
-        functools.partial(_handle_clear_power_limit, hass),
-        schema=_CLEAR_POWER_LIMIT_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_AUTHORIZE_ID_TOKEN,
-        functools.partial(_handle_authorize_id_token, hass),
-        schema=_AUTHORIZE_ID_TOKEN_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
-    )
+    for service, schema, handler in _SERVICES:
+        # functools.partial statt lambda: HA erkennt den Service-Handler nur dann
+        # korrekt als Coroutine-Funktion (und awaitet ihn selbst, statt eine
+        # nie awaitete Coroutine zurückzubekommen), wenn `asyncio.iscoroutinefunction`
+        # darauf zutrifft -- eine Lambda, die intern eine Coroutine zurückgibt,
+        # ist selbst KEINE Coroutine-Funktion; ein `partial` einer `async def`
+        # bleibt hingegen als solche erkennbar.
+        hass.services.async_register(
+            DOMAIN,
+            service,
+            functools.partial(handler, hass),
+            schema=schema,
+            supports_response=SupportsResponse.ONLY,
+        )
 
 
 def async_unregister_services(hass: HomeAssistant) -> None:
@@ -162,9 +277,5 @@ def async_unregister_services(hass: HomeAssistant) -> None:
 
     Wird aufgerufen, sobald der letzte Config Entry entladen wurde (siehe ``__init__.py``).
     """
-    for service in (
-        SERVICE_SET_POWER_LIMIT,
-        SERVICE_CLEAR_POWER_LIMIT,
-        SERVICE_AUTHORIZE_ID_TOKEN,
-    ):
+    for service, _schema, _handler in _SERVICES:
         hass.services.async_remove(DOMAIN, service)

@@ -3,12 +3,18 @@
     "step": {
       "user": {
         "title": "OCCP Central System einrichten",
-        "description": "Listen-Adresse und -Port für den OCPP-1.6-WebSocket-Endpunkt (nur ws://, siehe REQ-0016). Optional: Pfad zur statischen idTag-Autorisierungsliste sowie ein fest konfiguriertes idTag für Remote-Start (REQ-0020).",
+        "description": "Listen-Adresse und -Port für den OCPP-1.6-WebSocket-Endpunkt (nur ws://, siehe REQ-0016). Optional: Pfad zur statischen idTag-Autorisierungsliste sowie ein fest konfiguriertes idTag für Remote-Start (REQ-0020) -- beides später über \"Konfigurieren\" änderbar.",
         "data": {
           "host": "Host/Bind-Adresse",
           "port": "Port",
           "authorization_file": "Pfad zur idTag-Autorisierungsliste (optional)",
           "default_id_tag": "idTag für Remote-Start (optional)"
+        },
+        "data_description": {
+          "host": "Netzwerkadresse, auf der der OCPP-1.6-WebSocket-Server auf Charge Points wartet.",
+          "port": "Port, auf dem der OCPP-1.6-WebSocket-Server auf Charge Points wartet.",
+          "authorization_file": "Pfad zu einer JSON-Datei mit einer statischen Liste erlaubter idTags.",
+          "default_id_tag": "idTag, das der Start/Stop-Schalter für RemoteStartTransaction verwendet."
         }
       }
     },
@@ -17,6 +23,20 @@
     },
     "abort": {
       "already_configured": "Diese Central-System-Instanz (Host/Port) ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "authorization_file": "Pfad zur idTag-Autorisierungsliste (optional)",
+          "default_id_tag": "idTag für Remote-Start (optional)"
+        },
+        "data_description": {
+          "authorization_file": "Pfad zu einer JSON-Datei mit einer statischen Liste erlaubter idTags.",
+          "default_id_tag": "idTag, das der Start/Stop-Schalter für RemoteStartTransaction verwendet."
+        }
+      }
     }
   },
   "services": {
@@ -38,6 +58,32 @@
       "fields": {
         "charge_point_id": { "name": "Charge-Point-ID", "description": "Identität des Ladepunkts." },
         "id_token": { "name": "idToken", "description": "Zu prüfendes idToken." }
+      }
+    },
+    "reset": {
+      "name": "Zurücksetzen",
+      "description": "Setzt die Ladestation zurück (Soft oder Hard Reset).",
+      "fields": {
+        "reset_type": { "name": "Art", "description": "Soft (Neustart der Software) oder Hard (Neustart der Hardware)." }
+      }
+    },
+    "unlock_connector": {
+      "name": "Connector entriegeln",
+      "description": "Fordert die Ladestation auf, den Connector zu entriegeln."
+    },
+    "get_configuration": {
+      "name": "Konfiguration abfragen",
+      "description": "Liest Konfigurationswerte der Ladestation aus.",
+      "fields": {
+        "keys": { "name": "Schlüssel", "description": "Optionale Liste abzufragender Konfigurationsschlüssel -- leer lassen für alle." }
+      }
+    },
+    "change_configuration": {
+      "name": "Konfiguration ändern",
+      "description": "Setzt einen einzelnen Konfigurationswert der Ladestation.",
+      "fields": {
+        "key": { "name": "Schlüssel", "description": "Name des Konfigurationsschlüssels." },
+        "value": { "name": "Wert", "description": "Neuer Wert für den Konfigurationsschlüssel." }
       }
     }
   }

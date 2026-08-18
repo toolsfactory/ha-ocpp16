@@ -36,3 +36,53 @@ authorize_id_token:
       required: true
       selector:
         text:
+
+reset:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
+    reset_type:
+      required: true
+      selector:
+        select:
+          options: ["Soft", "Hard"]
+
+unlock_connector:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
+
+get_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
+    keys:
+      required: false
+      selector:
+        text:
+          multiple: true
+
+change_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: occp
+    key:
+      required: true
+      selector:
+        text:
+    value:
+      required: true
+      selector:
+        text:

@@ -10,7 +10,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from custom_components.occp.core.config import AppConfig
-from custom_components.occp.core.domain.authorization import StaticAuthorizationProvider
+from custom_components.occp.core.domain.authorization import AuthorizationProvider, StaticAuthorizationProvider
 from custom_components.occp.core.domain.commands import CommandService
 from custom_components.occp.core.domain.connector_state import ConnectorStateStore
 from custom_components.occp.core.domain.events import EventBus
@@ -30,19 +30,27 @@ logger = logging.getLogger(__name__)
 class CentralSystemApp:
     """Composition root for the standalone core: wires config into runnable domain services."""
 
-    def __init__(self, config: AppConfig) -> None:
-        """Build the domain services and handler wiring from `config`."""
+    def __init__(self, config: AppConfig, *, authorization: AuthorizationProvider | None = None) -> None:
+        """Build the domain services and handler wiring from `config`.
+
+        `authorization` lets a caller running inside an event loop (the HA layer) load the
+        authorization file itself via an executor job and inject the result, instead of the
+        blocking `Path.read_text()` in `StaticAuthorizationProvider.from_json_file()` running
+        directly on the loop. The standalone CLI has no event loop yet at construction time
+        (see ``__main__.py``), so it is safe to let this fall back to the synchronous load.
+        """
         self.config = config
         self.registry = ChargePointRegistryStore()
         self.connectors = ConnectorStateStore()
         self.transactions = TransactionManager()
         self.meter_values = MeterValueStore()
         self.events = EventBus()
-        self.authorization = (
-            StaticAuthorizationProvider.from_json_file(config.authorization_file)
-            if config.authorization_file is not None
-            else StaticAuthorizationProvider.empty()
-        )
+        if authorization is not None:
+            self.authorization = authorization
+        elif config.authorization_file is not None:
+            self.authorization = StaticAuthorizationProvider.from_json_file(config.authorization_file)
+        else:
+            self.authorization = StaticAuthorizationProvider.empty()
         self.query_service = QueryServiceImpl(
             registry=self.registry,
             connectors=self.connectors,

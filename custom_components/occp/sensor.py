@@ -4,14 +4,14 @@ Dynamische Measurand-Sensoren (REQ-0018), die garantierten Fähigkeit-1/5-
 Entities (REQ-0035) und die Status-Entity (REQ-0019, inkl.
 Fähigkeit-7-Discovery-Attribute) -- Aufbau/Auffindung neuer Charge
 Points/Connectors/Measurands folgt dem Push-Modell aus ADR-0008 Abschnitt 2
-(jede Entity liest bei jedem Dispatcher-Ereignis ihren eigenen Ausschnitt
-frisch aus ``QueryService``/``CommandService``).
+über den ``OccpCoordinator`` (jede Entity liest bei jedem Coordinator-Update
+ihren eigenen Ausschnitt frisch aus ``QueryService``/``CommandService``).
 """
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from custom_components.occp.core.domain.models import ConnectionStatus, MeterSample, QueryService, StateChangeEvent
+from custom_components.occp.core.domain.models import ConnectionStatus, MeterSample, QueryService
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import (
     PERCENTAGE,
@@ -21,23 +21,21 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import interop
-from .const import (
-    RAW_STATUS_TO_STATE,
-    STATE_ERROR,
-    SUPPORTED_CAPABILITIES,
-    SUPPORTED_PHASES,
-    signal_new_charge_point,
-    signal_state_update,
-)
+from .const import RAW_STATUS_TO_STATE, STATE_ERROR, SUPPORTED_CAPABILITIES, SUPPORTED_PHASES
+from .coordinator import OccpCoordinator
 from .device import connector_device_info
 from .runtime import OccpConfigEntry, OccpEntryData
 
 _LOGGER = logging.getLogger(__name__)
+
+# Rein lesend -- jede Entity liest bei jedem Dispatcher-Ereignis ihren eigenen
+# Ausschnitt, kein eigener I/O-Aufruf (siehe Moduldocstring).
+PARALLEL_UPDATES = 0
 
 # REQ-0018 AC3: Gesamtenergiezähler muss mit passender device_class/
 # state_class fürs Energie-Dashboard erkennbar sein. Weitere gängige OCPP-1.6-
@@ -74,8 +72,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: OccpConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up sensor entities for a config entry."""
-    manager = _SensorManager(hass, entry.entry_id, entry.runtime_data, async_add_entities)
-    manager.async_setup()
+    manager = _SensorManager(entry.runtime_data, async_add_entities)
+    entry.async_on_unload(manager.async_setup())
 
 
 class _SensorManager:
@@ -84,51 +82,32 @@ class _SensorManager:
     Sobald Charge Points/Connectors/Measurands erstmals bekannt werden
     (REQ-0017/REQ-0018) -- selbst keine Entity, sondern reines
     Setup-Hilfsobjekt (vergleichbar einer schlanken, push-basierten
-    Alternative zu HA-Discovery-Callbacks).
+    Alternative zu HA-Discovery-Callbacks). Reagiert auf ``OccpCoordinator``-
+    Updates statt eigener Dispatcher-Signale.
     """
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        entry_id: str,
-        entry_data: OccpEntryData,
-        async_add_entities: AddEntitiesCallback,
-    ) -> None:
-        self.hass = hass
-        self.entry_id = entry_id
+    def __init__(self, entry_data: OccpEntryData, async_add_entities: AddEntitiesCallback) -> None:
         self.entry_data = entry_data
+        self.coordinator = entry_data.coordinator
         self.async_add_entities = async_add_entities
         self._known_connectors: set[tuple[str, int]] = set()
         self._known_measurands: set[tuple[str, int, str, str | None]] = set()
-        self._known_charge_points: set[str] = set()
 
-    def async_setup(self) -> None:
-        async_dispatcher_connect(
-            self.hass,
-            signal_new_charge_point(self.entry_id),
-            self._async_add_charge_point,
-        )
+    def async_setup(self) -> CALLBACK_TYPE:
+        """Start listening and sync already-known charge points. Returns the coordinator unsubscribe callable."""
+        remove_listener = self.coordinator.async_add_listener(self._handle_coordinator_update)
         # Race zwischen app.start() und Plattform-Forward abdecken (ADR-0008):
         # bereits bekannte Charge Points direkt beim Plattform-Setup aufnehmen.
         for snapshot in self.entry_data.app.query_service.get_charge_points():
-            self._async_add_charge_point(snapshot.charge_point_id)
+            self._sync_connectors(snapshot.charge_point_id)
+        return remove_listener
 
     @callback
-    def _async_add_charge_point(self, charge_point_id: str) -> None:
-        if charge_point_id in self._known_charge_points:
+    def _handle_coordinator_update(self) -> None:
+        event = self.coordinator.data
+        if event is None:
             return
-        self._known_charge_points.add(charge_point_id)
-
-        async_dispatcher_connect(
-            self.hass,
-            signal_state_update(self.entry_id, charge_point_id),
-            callback(lambda event: self._handle_event(charge_point_id, event)),
-        )
-        self._sync_connectors(charge_point_id)
-
-    @callback
-    def _handle_event(self, charge_point_id: str, event: StateChangeEvent) -> None:
-        self._sync_connectors(charge_point_id, only_connector_id=event.connector_id)
+        self._sync_connectors(event.charge_point_id, only_connector_id=event.connector_id)
 
     def _sync_connectors(self, charge_point_id: str, only_connector_id: int | None = None) -> None:
         query_service = self.entry_data.app.query_service
@@ -146,9 +125,9 @@ class _SensorManager:
                 self._known_connectors.add(key)
                 new_entities.extend(
                     [
-                        OccpChargePointStateSensor(self.entry_id, self.entry_data, charge_point_id, connector_id),
-                        OccpCurrentPowerSensor(self.entry_id, self.entry_data, charge_point_id, connector_id),
-                        OccpEffectivePowerLimitSensor(self.entry_id, self.entry_data, charge_point_id, connector_id),
+                        OccpChargePointStateSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OccpCurrentPowerSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OccpEffectivePowerLimitSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                     ]
                 )
             new_entities.extend(self._new_measurand_sensors(charge_point_id, connector_id))
@@ -168,7 +147,7 @@ class _SensorManager:
             self._known_measurands.add(key)
             new_sensors.append(
                 OccpMeasurandSensor(
-                    self.entry_id,
+                    self.coordinator,
                     self.entry_data,
                     charge_point_id,
                     connector_id,
@@ -187,48 +166,35 @@ def _is_charge_point_online(query_service: QueryService, charge_point_id: str) -
     return False
 
 
-class _OccpConnectorSensorBase(SensorEntity):
+class _OccpConnectorSensorBase(CoordinatorEntity[OccpCoordinator], SensorEntity):
     """Gemeinsame Basis aller connectorbezogenen Sensor-Entities.
 
-    Push-only (``_attr_should_poll = False``, ``iot_class: local_push``):
-    jede Instanz abonniert in ``async_added_to_hass`` das Dispatcher-Signal
-    für ihren Charge Point und liest bei jedem Ereignis ihren Ausschnitt
-    frisch aus ``QueryService``/``CommandService`` (ADR-0008 Abschnitt 2).
+    Push-only (``iot_class: local_push``): ``CoordinatorEntity`` verdrahtet
+    Lifecycle/Update-Listener automatisch; jede Instanz liest bei jedem
+    Coordinator-Update ihren Ausschnitt frisch aus
+    ``QueryService``/``CommandService`` (ADR-0008 Abschnitt 2).
     """
 
-    _attr_should_poll = False
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        entry_id: str,
+        coordinator: OccpCoordinator,
         entry_data: OccpEntryData,
         charge_point_id: str,
         connector_id: int,
         entity_key: str,
     ) -> None:
-        self._entry_id = entry_id
+        super().__init__(coordinator)
         self._entry_data = entry_data
         self._charge_point_id = charge_point_id
         self._connector_id = connector_id
         self._attr_unique_id = f"{charge_point_id}_{connector_id}_{entity_key}"
         self._attr_device_info = connector_device_info(charge_point_id, connector_id)
 
-    async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                signal_state_update(self._entry_id, self._charge_point_id),
-                self._async_handle_event,
-            )
-        )
-
-    async def _async_handle_event(self, event: StateChangeEvent) -> None:
-        self.async_write_ha_state()
-
     @property
     def available(self) -> bool:
-        return _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
+        return super().available and _is_charge_point_online(self._entry_data.app.query_service, self._charge_point_id)
 
 
 class OccpCurrentPowerSensor(_OccpConnectorSensorBase):
@@ -243,9 +209,11 @@ class OccpCurrentPowerSensor(_OccpConnectorSensorBase):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, entry_id: str, entry_data: OccpEntryData, charge_point_id: str, connector_id: int) -> None:
+    def __init__(
+        self, coordinator: OccpCoordinator, entry_data: OccpEntryData, charge_point_id: str, connector_id: int
+    ) -> None:
         """Initialize the entity for the given charge point connector."""
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, "current_power_w")
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, "current_power_w")
 
     @property
     def native_value(self) -> float | None:
@@ -274,17 +242,30 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
-    def __init__(self, entry_id: str, entry_data: OccpEntryData, charge_point_id: str, connector_id: int) -> None:
+    def __init__(
+        self, coordinator: OccpCoordinator, entry_data: OccpEntryData, charge_point_id: str, connector_id: int
+    ) -> None:
         """Initialize the entity for the given charge point connector."""
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, "effective_power_limit_w")
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, "effective_power_limit_w")
         self._value: float | None = None
 
-    async def _async_handle_event(self, event: StateChangeEvent) -> None:
-        if event.connector_id is not None and event.connector_id != self._connector_id:
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        event = self.coordinator.data
+        if event is not None and event.connector_id is not None and event.connector_id != self._connector_id:
             # Kein charge-point-weites Ereignis und nicht für diesen Connector --
             # ein GetCompositeSchedule-Aufruf hier wäre nur unnötiger Central-
             # System-initiierter Traffic zum Charge Point.
             return
+        if TYPE_CHECKING:
+            assert self.coordinator.config_entry is not None
+        self.coordinator.config_entry.async_create_background_task(
+            self.hass,
+            self._async_refresh_power_limit(),
+            f"occp_effective_power_limit_{self._charge_point_id}_{self._connector_id}",
+        )
+
+    async def _async_refresh_power_limit(self) -> None:
         try:
             self._value = await interop.get_effective_power_limit_w(
                 self._entry_data.app.command_service,
@@ -295,8 +276,8 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
             # Central-System-initiierter Aufruf kann jederzeit fehlschlagen
             # (z. B. Charge Point trennt gerade die Verbindung) -- ein
             # einzelner fehlgeschlagener GetCompositeSchedule-Versuch darf
-            # nicht den gesamten Dispatcher-Callback (und damit andere
-            # Entities desselben Signals) zum Absturz bringen.
+            # nicht den gesamten Coordinator-Listener (und damit andere
+            # Entities desselben Updates) zum Absturz bringen.
             _LOGGER.debug(
                 "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert.",
                 self._charge_point_id,
@@ -321,9 +302,11 @@ class OccpChargePointStateSensor(_OccpConnectorSensorBase):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(dict.fromkeys(RAW_STATUS_TO_STATE.values()))
 
-    def __init__(self, entry_id: str, entry_data: OccpEntryData, charge_point_id: str, connector_id: int) -> None:
+    def __init__(
+        self, coordinator: OccpCoordinator, entry_data: OccpEntryData, charge_point_id: str, connector_id: int
+    ) -> None:
         """Initialize the entity for the given charge point connector."""
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, "charge_point_state")
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, "charge_point_state")
 
     @property
     def _connector_snapshot(self):
@@ -364,7 +347,7 @@ class OccpMeasurandSensor(_OccpConnectorSensorBase):
 
     def __init__(
         self,
-        entry_id: str,
+        coordinator: OccpCoordinator,
         entry_data: OccpEntryData,
         charge_point_id: str,
         connector_id: int,
@@ -373,7 +356,7 @@ class OccpMeasurandSensor(_OccpConnectorSensorBase):
     ) -> None:
         """Initialize the entity for the given measurand/phase pair."""
         entity_key = f"measurand_{_measurand_object_id(measurand, phase)}"
-        super().__init__(entry_id, entry_data, charge_point_id, connector_id, entity_key)
+        super().__init__(coordinator, entry_data, charge_point_id, connector_id, entity_key)
         self._measurand = measurand
         self._phase = phase
         self._attr_name = f"{measurand}{f' ({phase})' if phase else ''}"

@@ -6,10 +6,17 @@ Importzyklus mit ``__init__.py`` (das seinerseits Entity-Plattformen anstößt)
 zu erzeugen.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from custom_components.occp.core.app import CentralSystemApp
 from homeassistant.config_entries import ConfigEntry
+
+if TYPE_CHECKING:
+    # Nur für Typprüfung: würde zur Laufzeit einen Zyklus mit
+    # coordinator.coordinator (importiert seinerseits diesen Typalias nicht,
+    # aber der Zyklus entstünde trivial bei künftigen Refactorings) erzeugen.
+    from .coordinator import OccpCoordinator
 
 
 @dataclass
@@ -17,12 +24,8 @@ class OccpEntryData:
     """Pro Config Entry gehaltener Zustand des HA-Layers."""
 
     app: CentralSystemApp
+    coordinator: OccpCoordinator
     default_id_tag: str | None
-    # REQ-0017 AC1: Entity-Anlage erfolgt erst, wenn ein Charge Point
-    # tatsächlich erstmals eine StateChangeEvent auslöst (siehe
-    # ``const.signal_new_charge_point``) -- dieses Set verhindert doppelte
-    # "neuer Charge Point"-Dispatcher-Signale für bereits bekannte IDs.
-    known_charge_points: set[str] = field(default_factory=set)
 
 
 type OccpConfigEntry = ConfigEntry[OccpEntryData]
