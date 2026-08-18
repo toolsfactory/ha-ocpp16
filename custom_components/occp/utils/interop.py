@@ -2,7 +2,7 @@
 
 Bündelt die Abbildung der Interop-Vertrag-Fähigkeiten 1, 3, 4, 5, 7 (Werte)
 und 8 auf ``CommandService``/``QueryService``/``AuthorizationProvider`` an
-einer Stelle -- ``sensor.py``/``switch.py``/``services.py`` rufen diese
+einer Stelle -- ``sensor/``/``switch/``/``service_actions/`` rufen diese
 Funktionen auf, statt Vertragsdetails selbst zu kennen (ADR-0010,
 "Adapter-Modul").
 
@@ -11,11 +11,10 @@ hier, da sie durch eigene REQs abgedeckt sind (siehe ADR-0010 Non-Goals-
 Abgrenzung in REQ-0035).
 """
 
+from custom_components.occp.const import MEASURAND_POWER_ACTIVE_IMPORT
 from custom_components.occp.core.domain.authorization import AuthorizationProvider, IdTagStatus
 from custom_components.occp.core.domain.commands import CommandService
 from custom_components.occp.core.domain.models import QueryService
-
-from .const import MEASURAND_POWER_ACTIVE_IMPORT
 
 # -- Fähigkeit 1 --------------------------------------------------------
 

@@ -3,9 +3,9 @@
 import logging
 from typing import TYPE_CHECKING
 
-from custom_components.occp import interop
 from custom_components.occp.coordinator import OccpCoordinator
 from custom_components.occp.runtime import OccpEntryData
+from custom_components.occp.utils import interop
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import UnitOfPower
 from homeassistant.core import callback

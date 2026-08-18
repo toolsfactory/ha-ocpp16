@@ -2,8 +2,8 @@
 
 import voluptuous as vol
 
-from custom_components.occp import interop
 from custom_components.occp.core.domain.commands import CommandError
+from custom_components.occp.utils import interop
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import ServiceValidationError

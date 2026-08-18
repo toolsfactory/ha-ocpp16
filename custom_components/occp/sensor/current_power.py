@@ -1,8 +1,8 @@
 """Garantiert vorhandene Ist-Ladeleistungs-Entity (Fähigkeit 1, REQ-0035 AC1)."""
 
-from custom_components.occp import interop
 from custom_components.occp.coordinator import OccpCoordinator
 from custom_components.occp.runtime import OccpEntryData
+from custom_components.occp.utils import interop
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
 

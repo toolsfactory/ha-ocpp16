@@ -2,7 +2,7 @@
 
 import voluptuous as vol
 
-from custom_components.occp import interop
+from custom_components.occp.utils import interop
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
