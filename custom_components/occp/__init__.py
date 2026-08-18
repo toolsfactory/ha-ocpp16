@@ -64,12 +64,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
             f"Konnte den WebSocket-Server nicht auf {config.host}:{config.port} binden: {err}"
         ) from err
 
-    coordinator = OccpCoordinator(hass, entry, app)
-    entry.async_on_unload(coordinator.async_unsubscribe)
-
-    entry_data = OccpEntryData(app=app, coordinator=coordinator, default_id_tag=entry.options.get(CONF_DEFAULT_ID_TAG))
-    entry.runtime_data = entry_data
-
     device_registry = dr.async_get(hass)
 
     def _register_device(event: StateChangeEvent) -> None:
@@ -81,8 +75,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
             **charge_point_device_info(event.charge_point_id, app.registry.get(event.charge_point_id)),
         )
 
+    # Muss VOR dem Coordinator abonnieren: der EventBus ruft Listener in
+    # Subscription-Reihenfolge auf, und der Coordinator triggert innerhalb
+    # desselben synchronen Aufrufs (DataUpdateCoordinator.async_set_updated_data)
+    # bereits Sensor-/Switch-Manager, deren Connector-Devices per via_device auf
+    # das hier erstellte Charge-Point-Device zeigen -- andernfalls existiert das
+    # beim ersten Event noch nicht.
     unsubscribe_device_registration = app.query_service.subscribe(_register_device)
     entry.async_on_unload(unsubscribe_device_registration)
+
+    coordinator = OccpCoordinator(hass, entry, app)
+    entry.async_on_unload(coordinator.async_unsubscribe)
+
+    entry_data = OccpEntryData(app=app, coordinator=coordinator, default_id_tag=entry.options.get(CONF_DEFAULT_ID_TAG))
+    entry.runtime_data = entry_data
 
     # authorization_file/default_id_tag sind einmalig in CentralSystemApp/entry_data
     # eingebaut -- eine Options-Änderung braucht einen Reload, um zu wirken.
