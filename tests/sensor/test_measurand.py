@@ -46,6 +46,30 @@ async def test_new_measurand_creates_a_sensor_with_mapped_unit_and_device_class(
     assert state.attributes["state_class"] == "total_increasing"
 
 
+async def test_mapped_measurand_gets_a_readable_translated_name(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+    record_meter_sample: Callable[..., None],
+) -> None:
+    """A known measurand's friendly name comes from the entity translation, not the raw OCPP string."""
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    record_meter_sample(entry_data.app, connector_id=1, measurand="Current.Import", value="6", unit="A", phase="L1")
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_measurand_current_import_l1"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
+    assert entity_id is not None
+
+    entry = er.async_get(hass).async_get(entity_id)
+    assert entry.translation_key == "measurand"
+    assert entry.name is None  # not overridden -- resolved from the translation at render time
+
+
 async def test_multi_phase_samples_of_the_same_measurand_do_not_overwrite_each_other(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

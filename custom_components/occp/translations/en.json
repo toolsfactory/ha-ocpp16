@@ -65,6 +65,9 @@
       },
       "active_phases": {
         "name": "Active Phases"
+      },
+      "measurand": {
+        "name": "{measurand_name}"
       }
     },
     "switch": {

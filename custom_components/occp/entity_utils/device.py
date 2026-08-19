@@ -81,7 +81,7 @@ def charge_point_device_info(entry_id: str, charge_point_id: str, snapshot: Char
     """Device-Info für den Charge Point selbst (REQ-0017 AC1)."""
     return DeviceInfo(
         identifiers={(DOMAIN, charge_point_identifier(entry_id, charge_point_id))},
-        name=f"Ladestation {charge_point_id}",
+        name=f"Charge Point {charge_point_id}",
         manufacturer=snapshot.vendor if snapshot else None,
         model=snapshot.model if snapshot else None,
         sw_version=snapshot.firmware_version if snapshot else None,
@@ -97,6 +97,6 @@ def connector_device_info(entry_id: str, charge_point_id: str, connector_id: int
     """
     return DeviceInfo(
         identifiers={(DOMAIN, connector_identifier(entry_id, charge_point_id, connector_id))},
-        name=f"Ladepunkt {connector_id}",
+        name=f"Connector {connector_id}",
         via_device=(DOMAIN, charge_point_identifier(entry_id, charge_point_id)),
     )

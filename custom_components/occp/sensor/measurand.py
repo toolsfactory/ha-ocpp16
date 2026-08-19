@@ -39,6 +39,29 @@ _MEASURAND_META: dict[str, tuple[SensorDeviceClass | None, SensorStateClass | No
     "Power.Offered": (SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT),
 }
 
+# Lesbare Anzeigenamen für die in _MEASURAND_META bekannten Measurands (REQ-0018,
+# Quality-Scale-Regel entity-translations) -- unbekannte Measurands fallen auf eine
+# humanisierte Version des rohen OCPP-Strings zurück, nie ein harter Fehler.
+_MEASURAND_DISPLAY_NAMES: dict[str, str] = {
+    "Energy.Active.Import.Register": "Energy (Import)",
+    "Energy.Active.Export.Register": "Energy (Export)",
+    "Power.Active.Import": "Power (Import)",
+    "Power.Active.Export": "Power (Export)",
+    "Current.Import": "Current (Import)",
+    "Current.Export": "Current (Export)",
+    "Current.Offered": "Current (Offered)",
+    "Voltage": "Voltage",
+    "Temperature": "Temperature",
+    "SoC": "State of Charge",
+    "Power.Offered": "Power (Offered)",
+}
+
+
+def _measurand_display_name(measurand: str, phase: str | None) -> str:
+    name = _MEASURAND_DISPLAY_NAMES.get(measurand, measurand.replace(".", " "))
+    return f"{name} {phase}" if phase else name
+
+
 _UNIT_OVERRIDES: dict[str, str] = {
     "Wh": UnitOfEnergy.WATT_HOUR,
     "kWh": UnitOfEnergy.KILO_WATT_HOUR,
@@ -77,7 +100,8 @@ class OccpMeasurandSensor(_OccpConnectorSensorBase):
         super().__init__(coordinator, entry_data, charge_point_id, connector_id, entity_key)
         self._measurand = measurand
         self._phase = phase
-        self._attr_name = f"{measurand}{f' ({phase})' if phase else ''}"
+        self._attr_translation_key = "measurand"
+        self._attr_translation_placeholders = {"measurand_name": _measurand_display_name(measurand, phase)}
         device_class, state_class = _MEASURAND_META.get(measurand, (None, None))
         self._attr_device_class = device_class
         self._attr_state_class = state_class
