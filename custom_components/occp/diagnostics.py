@@ -28,6 +28,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: OccpCon
         connectors = query_service.get_connectors(snapshot.charge_point_id)
         charge_points.append(
             {
+                # Bewusst nicht geschwärzt -- siehe DECISIONS.md "Accepted risk: charge_point_id
+                # is not redacted in diagnostics" (bereits als Gerätename überall in der UI sichtbar).
                 "charge_point_id": snapshot.charge_point_id,
                 "connection_status": snapshot.connection_status,
                 "vendor": snapshot.vendor,

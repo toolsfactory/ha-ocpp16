@@ -292,6 +292,33 @@ enabled by default is, by construction, already in `_MEASURAND_META`.
 
 ---
 
+### Accepted risk: `charge_point_id` is not redacted in diagnostics
+
+**Date:** 2026-08-19
+
+**Context:** `diagnostics.py` redacts `host`, the authorization-file path, and the default idTag,
+but leaves each charge point's `charge_point_id` in plain text. A 2026-08-19 QUALITY_REVIEW.md pass
+flagged this — `charge_point_id` is chosen by whoever installs the charge point, not by OCCP, so it
+can in principle carry a location, site, or customer name (e.g. `"Garage-Munich-Slot-5"`).
+
+**Decision:** Leave it unredacted. Accepted, not fixed.
+
+**Rationale:** `charge_point_id` is not actually hidden anywhere else in this integration — it is
+the literal device name shown throughout the Home Assistant UI (`charge_point_device_info()` sets
+`name=f"Charge Point {charge_point_id}"`), visible to anyone with access to **Settings** → **Devices
+& Services** already. Redacting it only in the diagnostics export would not meaningfully improve
+privacy — the same string is one click away regardless — while it would actively hurt the
+diagnostics export's usefulness (harder to match an entry back to the device it describes when
+troubleshooting with the developer). This differs from `host`/`authorization_file`/`default_id_tag`,
+none of which are ever shown in the UI elsewhere.
+
+**Consequences:** A diagnostics export should still be treated as something to review before
+sharing outside the household/installation, the same way a device name or dashboard screenshot
+would be — this is about not duplicating an existing, already-visible identifier, not about
+diagnostics being free of anything sensitive.
+
+---
+
 ## Future Considerations
 
 ### State Restoration
