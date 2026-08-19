@@ -8,7 +8,7 @@ Assistant is the server, and charge points are the clients.
 
 ## Prerequisites
 
-- Home Assistant 2025.7.0 or newer
+- Home Assistant 2026.8.0 or newer
 - HACS (Home Assistant Community Store) installed
 - An OCPP 1.6 charge point (or a simulator, e.g.
   [shiv3/ocpp-cp-simulator](https://github.com/shiv3/ocpp-cp-simulator)) that can be pointed at a
@@ -203,6 +203,17 @@ logger:
 ```
 
 Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs for detailed information.
+
+## Removal
+
+1. Go to **Settings** → **Devices & Services** → **OCCP - OCPP 1.6 Central System**.
+2. Open the instance you want to remove and select **Delete**.
+3. Home Assistant stops the WebSocket server, removes every device and entity that instance
+   created, and deregisters its config entry automatically — no manual cleanup needed there.
+4. If you configured an idTag authorization file (outside the `config/` directory Home Assistant
+   manages), it is left on disk untouched; delete it yourself if you no longer need it.
+5. To remove the integration entirely (all instances), also remove it via HACS or delete
+   `custom_components/occp/` if installed manually, then restart Home Assistant.
 
 ## Next Steps
 
