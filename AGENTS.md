@@ -90,7 +90,10 @@ These are the ones an agent typically breaks _before_ it realises a skill or ins
 
 - **Entities → Coordinator → source.** Never skip a layer; entities read `coordinator.data` and never reach past it.
   The source is usually an API client in `api/`, but it can equally be a state listener, a file, or a computation —
-  an integration that fetches nothing has no `api/` package, and the layering above it is unchanged.
+  an integration that fetches nothing has no `api/` package, and the layering above it is unchanged. This project's
+  coordinator is a deliberate, narrower exception — see
+  [`DECISIONS.md`](docs/development/DECISIONS.md#thin-coordinator-hold-the-last-event-not-a-data-snapshot) before
+  assuming a deviation here is a bug to fix.
 - **Register service actions in `async_setup()`**, not `async_setup_entry()` (Quality Scale rule `action-setup`).
 - **Never add `device_trigger.py`, `device_condition.py` or `device_action.py`.** Device automations are frozen
   upstream — existing ones keep working, new ones are not accepted. Older integrations are full of them, so this is a

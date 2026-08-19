@@ -104,6 +104,8 @@ first `BootNotification` — there is nothing to register manually.
   `unavailable`/`error`), with the raw OCPP status and error code as attributes
 - **Current Power** — the connector's current charging power in watts
 - **Effective Power Limit** — the power limit currently in effect, read back from the charge point
+- **Active Phases** — how many phases currently show a positive current, with each phase's current
+  as attributes
 - **Measurand sensors** — one dynamic sensor per measurand the charge point actually reports
   (energy, voltage, current, temperature, state of charge, ...)
 

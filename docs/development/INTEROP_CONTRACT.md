@@ -59,9 +59,15 @@ own test suite does (`homeassistant.helpers.entity_registry.async_get_entity_id`
 - **Connector device:** identifier `(DOMAIN, f"{charge_point_id}_{connector_id}")` =
   `("occp", "CP001_1")`. `connectorId` `0` (the charge point as a whole, per OCPP 1.6) never gets
   its own device — there are no capability-1/5/6 entities for it.
-- **Entity `unique_id`:** `{charge_point_id}_{connector_id}_{entity_key}` — `entity_key` is listed
-  per capability below. Resolve to an `entity_id` via the entity registry
+- **Entity `unique_id`:** `{entry_id}:{len(charge_point_id)}:{charge_point_id}:{connector_id}_{entity_key}`
+  — `entry_id` is the owning config entry's ID (a ULID, never contains `:`), the length-prefixed
+  `charge_point_id` makes the split unambiguous regardless of its content, and `entity_key` is
+  listed per capability below. Do not construct this string by hand — resolve through the device
+  registry (see below) and the entity registry
   (`async_get_entity_id(platform, DOMAIN, unique_id)`), then read `hass.states.get(entity_id)`.
+  This shape is a breaking change from an earlier `{charge_point_id}_{connector_id}_{entity_key}`
+  scheme that could collide across config entries or ambiguous `charge_point_id` values — see
+  [DECISIONS.md](./DECISIONS.md).
 - **Service `device_id`:** resolve a device via the device registry the same way, then pass its
   registry `id` (not the domain identifier tuple) as the service's `device_id` field.
 
@@ -74,7 +80,7 @@ from there.
 
 | #   | Bit | Name                       | HA surface                                       | Notes                                                                                                                                                                                                                                        |
 | --- | --- | -------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 1   | Current power              | `sensor`, `entity_key="current_power_w"`         | Watts. **Unavailable** (not `0`) until a matching `Power.Active.Import` measurand has actually been reported.                                                                                                                                |
+| 1   | 1   | Current power              | `sensor`, `entity_key="current_power_w"`         | Watts. **`unknown`** (not `0`) until a matching `Power.Active.Import` measurand has actually been reported.                                                                                                                                  |
 | 2   | 2   | State                      | `sensor`, `entity_key="charge_point_state"`      | Five-value state (`not_connected`/`ready`/`charging`/`unavailable`/`error`) — see [State mapping](#state-mapping). Carries the discovery attributes (capability 7).                                                                          |
 | 3   | 4   | Set power limit            | service `occp.set_power_limit`                   | `{device_id, limit_w, phases?}` → connector device. `{"status": "accepted"\|"rejected"\|"not_supported"}`.                                                                                                                                   |
 | 4   | 8   | Clear power limit          | service `occp.clear_power_limit`                 | `{device_id}` → connector device. `{"status": "accepted"\|"unknown"}`.                                                                                                                                                                       |
@@ -117,7 +123,7 @@ part of this contract — this is an explicit non-goal (`REQ-0020` Non-Goals in 
 not an oversight. A load-management integration must not assume this capability exists just
 because 1–6 and 8 do; it should check the bitmask.
 
-## Services outside this contract
+## Services and entities outside this contract
 
 `occp.reset`, `occp.unlock_connector`, `occp.get_configuration`, and `occp.change_configuration`
 exist (see the main [README](../../README.md)) but are **not** part of the numbered capability
@@ -125,6 +131,12 @@ contract above — they were added as a separate scope decision (see `DECISIONS.
 underlying OCPP calls already existed in `core/`, not because REQ-0035 calls for them. A
 load-management integration can use them, but should not treat their presence as guaranteed the
 way it can for capabilities 1–6 and 8.
+
+The same applies to the `active_phases` sensor (`sensor`, `entity_key="active_phases"`): state is
+the count of currently-active phases (a `Current.Import` sample above zero), with per-phase
+readings (`phase_l1_a`/`phase_l2_a`/`phase_l3_a`) as attributes. It is a convenience entity, not a
+REQ-0035 capability — a load-management integration wanting per-phase current for its own logic
+should read this sensor's attributes directly rather than expecting a bitmask entry for it.
 
 ## Stability
 

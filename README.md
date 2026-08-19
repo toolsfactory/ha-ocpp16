@@ -121,6 +121,8 @@ point as a whole, never gets its own entities).
   `Power.Active.Import` measurand
 - **Effective Power Limit**: The power limit currently in effect, read back from the charge point
   via `GetCompositeSchedule`
+- **Active Phases**: How many phases currently have a positive `Current.Import` reading, with each
+  phase's current (in amps) as attributes
 - **Measurand sensors**: One dynamic sensor per measurand a charge point actually reports (energy,
   voltage, current, temperature, state of charge, ...), split by phase where the charge point
   reports one

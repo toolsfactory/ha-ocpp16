@@ -180,6 +180,87 @@ exist today.
 
 ---
 
+### Entry-scoped device/entity identifiers, length-prefixed
+
+**Date:** 2026-08-19
+
+**Context:** `connector_identifier()` originally built device identifiers and entity `unique_id`s
+as `f"{charge_point_id}_{connector_id}"`, with no per-config-entry component. This collided in two
+ways: `charge_point_id="station_1"` connector 0 and `charge_point_id="station"` connector 1
+produced the same string, and two config entries that happened to see the same OCPP
+`chargePointId` (e.g. two independent simulators both booting as `CP001`) produced literally
+identical device identifiers, so the second entry's device silently merged into the first's in the
+device registry, and its service calls routed to whichever entry the device registry entry
+happened to point at.
+
+**Decision:** Identifiers are now `f"{entry_id}:{len(charge_point_id)}:{charge_point_id}:{connector_id}"`
+(the charge-point device drops the trailing `:{connector_id}`). Length-prefixing `charge_point_id`
+makes the split provably unambiguous regardless of what characters a charge point's ID contains — a
+plain extra separator would only make collisions less likely, not impossible. `entry_id` is a
+fixed-format ULID that structurally cannot contain `:`, so splitting off the first `:`-delimited
+segment is always safe.
+
+**Rationale:** Correctness over a plain separator scheme, and scoping by `entry_id` closes the
+cross-instance collision entirely rather than just making it rare. Service action resolution
+(`service_actions/_resolvers.py`) now scopes through `DeviceEntry.config_entry_id` for the same
+reason — device identity, not `charge_point_id` string matching, decides which entry a call
+belongs to.
+
+**Consequences:** Breaking change, shipped without a migration (pre-1.0, per `AGENTS.md`'s own
+default) — existing devices/entities from before this change become orphaned and need manual
+removal after upgrading. `authorize_id_token` is the one service that still resolves by bare
+`charge_point_id` (it takes no device), so it retains the residual cross-instance ambiguity this
+decision otherwise closes — tracked, not fixed, since closing it needs a service-schema change
+(e.g. an optional `device_id` alternative) that is its own breaking-change decision.
+
+---
+
+### `current_power_w` reports `unknown`, not `unavailable`, before the first sample
+
+**Date:** 2026-08-19
+
+**Context:** `OccpCurrentPowerSensor` overrode `available` to return `False` whenever no matching
+`MeterValues` sample had arrived yet — even while the charge point was fully connected and
+otherwise healthy. Home Assistant's own convention reserves `unavailable` for "cannot reach the
+device at all" and uses `unknown` for "reachable, but no value yet" (state class sensors return
+`None` from `native_value` for the latter, which HA renders as `unknown` automatically).
+
+**Decision:** Removed the `available` override; the sensor now falls back to
+`OccpConnectorEntity`'s online-only availability check, so it renders `unknown` until the first
+`Power.Active.Import` sample is reported.
+
+**Rationale:** Matches HA convention and what an automation author expects: `unavailable` should
+mean "something is wrong," not "this specific measurand hasn't been reported in this session yet."
+
+**Consequences:** Breaking change — a state-value change for anyone with automations or dashboards
+keyed on `unavailable` for this entity. Shipped together with the identifier-scheme break above so
+both land under one `BREAKING CHANGE:` release note instead of two.
+
+---
+
+### Meter-value store keys samples by `(measurand, phase)`, not bare `measurand`
+
+**Date:** 2026-08-19
+
+**Context:** `MeterValueStore` indexed the latest sample per connector/transaction by the bare
+OCPP `measurand` string. A three-phase `MeterValues` report sends one `sampledValue` entry per
+phase for the same measurand (e.g. `Current.Import` for L1, L2, L3) — each subsequent phase's
+sample overwrote the previous one under the same key, so only the last-processed phase's value was
+ever retained.
+
+**Decision:** `_by_connector`/`_by_transaction` are now keyed by `(measurand, phase)`, with
+`phase=None` reserved for a measurand reported without per-phase breakdown (e.g. a single combined
+total).
+
+**Rationale:** This is what made the new Active Phases sensor possible at all — it reads all three
+phases' `Current.Import` samples independently — and it was silently losing L1/L2 data for anyone
+already relying on per-phase `OccpMeasurandSensor` entities.
+
+**Consequences:** None externally visible beyond the fix itself — this is additive precision, not
+a shape change to any existing entity's state or attributes.
+
+---
+
 ## Future Considerations
 
 ### State Restoration
