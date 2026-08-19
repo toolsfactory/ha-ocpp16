@@ -8,12 +8,12 @@ This document describes all configuration options and settings available in the 
 
 These options are configured during initial setup via the Home Assistant UI.
 
-| Option                 | Type    | Required | Default   | Description                                                     |
-| ---------------------- | ------- | -------- | --------- | --------------------------------------------------------------- |
-| **Host**               | string  | Yes      | `0.0.0.0` | Bind address the OCPP WebSocket server listens on               |
-| **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                       |
-| **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = accept all |
-| **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start             |
+| Option                 | Type    | Required | Default   | Description                                                             |
+| ---------------------- | ------- | -------- | --------- | ----------------------------------------------------------------------- |
+| **Host**               | string  | Yes      | `0.0.0.0` | Bind address the OCPP WebSocket server listens on                       |
+| **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                               |
+| **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = reject every idTag |
+| **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start                     |
 
 Host and port are test-bound during setup — a port already in use is rejected immediately with a
 clear error instead of failing later.
@@ -30,8 +30,15 @@ clear error instead of failing later.
 ```
 
 Every field except the key itself is optional. `blocked: true` rejects the tag outright;
-`expiryDate` (ISO 8601) rejects it once past. Leave the authorization file unset to accept every
-idTag without checking.
+`expiryDate` (ISO 8601) rejects it once past.
+
+**Leaving the authorization file unset does not accept every idTag — it rejects every idTag.**
+With no file configured, OCCP's authorization provider has an empty allow-list, so
+`authorize_id_token` and every `RemoteStartTransaction`/`StartTransaction` idTag check comes back
+`Invalid` (`core/domain/authorization.py`'s `StaticAuthorizationProvider.authorize()` returns
+`Invalid` for any tag not found in its entries — an empty provider has none). Set an authorization
+file listing at least the `Default idTag` if you want the `start_stop` switch or
+`occp.authorize_id_token` to work at all.
 
 ### Options Flow (Reconfiguration)
 

@@ -222,12 +222,12 @@ data:
 
 ### During Setup
 
-| Name               | Required | Description                                                      |
-| ------------------ | -------- | ---------------------------------------------------------------- |
-| Host               | Yes      | Address the OCPP WebSocket server listens on (default `0.0.0.0`) |
-| Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)       |
-| Authorization File | No       | Path to a JSON file with a static idTag allow-list               |
-| Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command     |
+| Name               | Required | Description                                                                                                               |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Host               | Yes      | Address the OCPP WebSocket server listens on (default `0.0.0.0`)                                                          |
+| Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)                                                                |
+| Authorization File | No       | Path to a JSON file with a static idTag allow-list. **Leaving this unset rejects every idTag**, not the other way around. |
+| Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command — must appear in the allow-list above                        |
 
 Host and port are fixed once the entry is created (changing the listen address needs a new entry).
 Authorization File and Default idTag can be changed afterwards via **Settings** → **Devices &

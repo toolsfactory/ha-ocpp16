@@ -59,9 +59,12 @@ something else is rejected immediately with a clear error rather than failing la
 ### Step 2: Optional Settings
 
 - **Authorization File:** Path to a JSON file with a static idTag allow-list (see
-  [CONFIGURATION.md](./CONFIGURATION.md) for the format). Leave empty to accept every idTag.
+  [CONFIGURATION.md](./CONFIGURATION.md) for the format). **Leaving this empty rejects every
+  idTag**, not the other way around — set it (listing at least your **Default idTag**, below) if
+  you want to remote-start a transaction or use `occp.authorize_id_token` at all.
 - **Default idTag:** The idTag OCCP uses when the `start_stop` switch remote-starts a transaction.
-  Required only if you plan to use that switch.
+  Required only if you plan to use that switch — and must appear in the authorization file above,
+  or the charge point will reject the transaction as unauthorized.
 
 Both of these can be changed later without recreating the integration — see
 [CONFIGURATION.md](./CONFIGURATION.md).
