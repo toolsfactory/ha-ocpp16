@@ -1,5 +1,6 @@
 """Tests for `OccpEffectivePowerLimitSensor` (Fähigkeit 5, REQ-0035 AC4)."""
 
+import asyncio
 from collections.abc import Callable
 from unittest.mock import AsyncMock
 
@@ -44,6 +45,63 @@ async def test_refreshes_via_get_composite_schedule_on_a_connector_scoped_event(
 
     assert hass.states.get(entity_id).state == "5000.0"
     mock_charge_point_connection.get_composite_schedule.assert_awaited_with(1, 3600)
+
+
+async def test_coalesces_a_burst_of_events_into_at_most_one_follow_up_call(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """Three events while a `GetCompositeSchedule` call is in flight must not fire three calls.
+
+    Regression test: `_handle_coordinator_update` used to start a new background
+    task per qualifying event with no in-flight check, so a burst of events (e.g.
+    several `MeterValues` in a row) could fire several concurrent OCPP round trips
+    for the same connector. Now at most one call is ever in flight, and any events
+    that arrive while it is running coalesce into exactly one follow-up call.
+    """
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    gate = asyncio.Event()
+
+    async def _gated_get_composite_schedule(*_args, **_kwargs):
+        await gate.wait()
+        return mock_charge_point_connection.get_composite_schedule.return_value
+
+    mock_charge_point_connection.get_composite_schedule.side_effect = _gated_get_composite_schedule
+
+    # Fire the first event and let its background task actually start and block
+    # on the gate, without draining the event loop fully (that would hang, since
+    # the task cannot finish yet).
+    publish_state_change(entry_data.app, connector_id=1)
+    for _ in range(3):
+        await asyncio.sleep(0)
+
+    # Two more events arrive while the first call is still in flight.
+    publish_state_change(entry_data.app, connector_id=1)
+    publish_state_change(entry_data.app, connector_id=1)
+    for _ in range(3):
+        await asyncio.sleep(0)
+
+    assert mock_charge_point_connection.get_composite_schedule.call_count == 1
+
+    gate.set()
+    await hass.async_block_till_done()
+
+    # Coalesced: the burst produced exactly one follow-up call, not one per event.
+    assert mock_charge_point_connection.get_composite_schedule.call_count == 2
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
+    assert hass.states.get(entity_id).state == "5000.0"
 
 
 async def test_ignores_events_for_a_different_connector(

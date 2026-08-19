@@ -1,5 +1,6 @@
 """Wirksame Leistungsgrenze über ``GetCompositeSchedule`` (Fähigkeit 5, REQ-0035 AC4)."""
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,8 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
         """Initialize the entity for the given charge point connector."""
         super().__init__(coordinator, entry_data, charge_point_id, connector_id, "effective_power_limit_w")
         self._value: float | None = None
+        self._refresh_lock = asyncio.Lock()
+        self._refresh_pending = False
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -48,6 +51,13 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
             # Instanz mit identischer Connector-Nummerierung sich gegenseitig
             # zu unnötigen Abfragen triggern.
             return
+        if self._refresh_lock.locked():
+            # Ein Refresh läuft bereits -- statt eines weiteren parallelen
+            # GetCompositeSchedule-Aufrufs (unnötiger Central-System-initiierter
+            # Traffic bei einem Event-Burst) merken wir vor, dass nach dem
+            # laufenden Versuch noch einmal aufgefrischt werden muss.
+            self._refresh_pending = True
+            return
         if TYPE_CHECKING:
             assert self.coordinator.config_entry is not None
         self.coordinator.config_entry.async_create_background_task(
@@ -57,25 +67,30 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
         )
 
     async def _async_refresh_power_limit(self) -> None:
-        try:
-            self._value = await interop.get_effective_power_limit_w(
-                self._entry_data.app.command_service,
-                self._charge_point_id,
-                self._connector_id,
-            )
-        except Exception:
-            # Central-System-initiierter Aufruf kann jederzeit fehlschlagen
-            # (z. B. Charge Point trennt gerade die Verbindung) -- ein
-            # einzelner fehlgeschlagener GetCompositeSchedule-Versuch darf
-            # nicht den gesamten Coordinator-Listener (und damit andere
-            # Entities desselben Updates) zum Absturz bringen.
-            _LOGGER.debug(
-                "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert.",
-                self._charge_point_id,
-                self._connector_id,
-                exc_info=True,
-            )
-        self.async_write_ha_state()
+        async with self._refresh_lock:
+            while True:
+                self._refresh_pending = False
+                try:
+                    self._value = await interop.get_effective_power_limit_w(
+                        self._entry_data.app.command_service,
+                        self._charge_point_id,
+                        self._connector_id,
+                    )
+                except Exception:
+                    # Central-System-initiierter Aufruf kann jederzeit fehlschlagen
+                    # (z. B. Charge Point trennt gerade die Verbindung) -- ein
+                    # einzelner fehlgeschlagener GetCompositeSchedule-Versuch darf
+                    # nicht den gesamten Coordinator-Listener (und damit andere
+                    # Entities desselben Updates) zum Absturz bringen.
+                    _LOGGER.debug(
+                        "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert.",
+                        self._charge_point_id,
+                        self._connector_id,
+                        exc_info=True,
+                    )
+                self.async_write_ha_state()
+                if not self._refresh_pending:
+                    break
 
     @property
     def native_value(self) -> float | None:
