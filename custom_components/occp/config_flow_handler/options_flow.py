@@ -11,6 +11,7 @@ from typing import Any
 import voluptuous as vol
 
 from custom_components.occp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG
+from custom_components.occp.core.domain.authorization import IdTagStatus
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from .validators.authorization import validate_authorization_file
@@ -32,11 +33,20 @@ class OccpOptionsFlow(OptionsFlow):
 
         if user_input is not None:
             authorization_file = user_input.get(CONF_AUTHORIZATION_FILE, "")
+            default_id_tag = user_input.get(CONF_DEFAULT_ID_TAG, "")
             if authorization_file:
                 try:
-                    await self.hass.async_add_executor_job(validate_authorization_file, authorization_file)
+                    provider = await self.hass.async_add_executor_job(validate_authorization_file, authorization_file)
                 except OSError, ValueError:
                     errors[CONF_AUTHORIZATION_FILE] = "invalid_authorization_file"
+                else:
+                    if default_id_tag and provider.authorize(default_id_tag).status is not IdTagStatus.ACCEPTED:
+                        errors[CONF_DEFAULT_ID_TAG] = "default_id_tag_not_authorized"
+            elif default_id_tag:
+                # Ein Default-idTag (REQ-0020) ohne Autorisierungsdatei würde nie akzeptiert
+                # (leere Liste lehnt alles ab, siehe StaticAuthorizationProvider.authorize) --
+                # nur ein akzeptierter Eintrag darf als Default gespeichert werden.
+                errors[CONF_DEFAULT_ID_TAG] = "default_id_tag_not_authorized"
             if not errors:
                 return self.async_create_entry(data=user_input)
 

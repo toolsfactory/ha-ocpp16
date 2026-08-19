@@ -79,15 +79,36 @@ class StaticAuthorizationProvider:
                 "DEF456": {"blocked": true}
               }
             }
+
+        Validiert die Struktur explizit statt sich auf ``AttributeError``/``TypeError`` aus
+        fehlgeschlagenen ``.get()``/``.items()``-Aufrufen zu verlassen -- Aufrufer (Config-/
+        Options-Flow) fangen gezielt ``ValueError`` ab, nicht beliebige Exceptions.
         """
         raw = json.loads(path.read_text(encoding="utf-8"))
+        # ValueError, nicht TypeError (TRY004), ist hier bewusst: die Aufrufer in
+        # config_flow.py/options_flow.py fangen ausschließlich (OSError, ValueError) ab, um
+        # zwischen "unlesbar/ungültiger Inhalt" (Formularfehler) und einem echten Programmierfehler
+        # zu unterscheiden -- ein TypeError würde dort unbehandelt durchschlagen.
+        if not isinstance(raw, dict):
+            raise ValueError(f"Autorisierungsdatei: Wurzelelement muss ein Objekt sein, ist {type(raw).__name__}.")  # noqa: TRY004
+        id_tags = raw.get("idTags", {})
+        if not isinstance(id_tags, dict):
+            raise ValueError(f"Autorisierungsdatei: 'idTags' muss ein Objekt sein, ist {type(id_tags).__name__}.")  # noqa: TRY004
+
         entries = []
-        for id_tag, fields in raw.get("idTags", {}).items():
+        for id_tag, fields in id_tags.items():
+            if not isinstance(fields, dict):
+                raise ValueError(f"Autorisierungsdatei: Eintrag für idTag '{id_tag}' muss ein Objekt sein.")  # noqa: TRY004
+            blocked = fields.get("blocked", False)
+            if not isinstance(blocked, bool):
+                raise ValueError(f"Autorisierungsdatei: 'blocked' für idTag '{id_tag}' muss ein Boolean sein.")  # noqa: TRY004
             expiry_raw = fields.get("expiryDate")
+            if expiry_raw is not None and not isinstance(expiry_raw, str):
+                raise ValueError(f"Autorisierungsdatei: 'expiryDate' für idTag '{id_tag}' muss eine Zeichenkette sein.")
             entries.append(
                 StaticIdTagEntry(
                     id_tag=id_tag,
-                    blocked=bool(fields.get("blocked", False)),
+                    blocked=blocked,
                     parent_id_tag=fields.get("parentIdTag"),
                     expiry_date=(datetime.fromisoformat(expiry_raw) if expiry_raw else None),
                 )

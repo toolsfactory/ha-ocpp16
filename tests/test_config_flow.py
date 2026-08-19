@@ -12,8 +12,11 @@ from homeassistant.data_entry_flow import FlowResultType
 _BIND_PATH = "custom_components.occp.config_flow_handler.config_flow._try_bind_port"
 
 
-async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
+async def test_user_flow_creates_entry(hass: HomeAssistant, tmp_path) -> None:
     """The happy path shows the form once, then creates an entry."""
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text('{"idTags": {"TAG1": {}}}', encoding="utf-8")
+
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -21,13 +24,18 @@ async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:
     with patch(_BIND_PATH):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "0.0.0.0", CONF_PORT: 9500, CONF_DEFAULT_ID_TAG: "TAG1"},
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_AUTHORIZATION_FILE: str(auth_file),
+                CONF_DEFAULT_ID_TAG: "TAG1",
+            },
         )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "OCCP (0.0.0.0:9500)"
     assert result["data"] == {CONF_HOST: "0.0.0.0", CONF_PORT: 9500}
-    assert result["options"] == {CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: "TAG1"}
+    assert result["options"] == {CONF_AUTHORIZATION_FILE: str(auth_file), CONF_DEFAULT_ID_TAG: "TAG1"}
     assert result["result"].unique_id is not None
 
 
@@ -71,6 +79,72 @@ async def test_user_flow_invalid_authorization_file_recovers(hass: HomeAssistant
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
 
+async def test_user_flow_authorization_file_structural_errors_recover(hass: HomeAssistant, tmp_path) -> None:
+    """A syntactically valid but structurally wrong authorization file is a form error, not a crash."""
+    bad_files = {
+        "list_root.json": "[]",
+        "list_id_tags.json": '{"idTags": []}',
+        "non_object_entry.json": '{"idTags": {"TAG1": "not-an-object"}}',
+    }
+    for filename, content in bad_files.items():
+        bad_file = tmp_path / filename
+        bad_file.write_text(content, encoding="utf-8")
+
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+        with patch(_BIND_PATH):
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                {CONF_HOST: "0.0.0.0", CONF_PORT: 9500, CONF_AUTHORIZATION_FILE: str(bad_file)},
+            )
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {CONF_AUTHORIZATION_FILE: "invalid_authorization_file"}
+
+
+async def test_user_flow_default_id_tag_without_authorization_file_rejected(hass: HomeAssistant) -> None:
+    """A default idTag with no authorization file at all would never be accepted -- reject it up front."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "0.0.0.0", CONF_PORT: 9500, CONF_DEFAULT_ID_TAG: "TAG1"},
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DEFAULT_ID_TAG: "default_id_tag_not_authorized"}
+
+
+async def test_user_flow_default_id_tag_not_in_list_rejected(hass: HomeAssistant, tmp_path) -> None:
+    """An unknown, blocked, or expired default idTag is rejected, not silently saved."""
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text('{"idTags": {"BLOCKED": {"blocked": true}}}', encoding="utf-8")
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_AUTHORIZATION_FILE: str(auth_file),
+                CONF_DEFAULT_ID_TAG: "BLOCKED",
+            },
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DEFAULT_ID_TAG: "default_id_tag_not_authorized"}
+
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_AUTHORIZATION_FILE: str(auth_file),
+                CONF_DEFAULT_ID_TAG: "UNKNOWN-TAG",
+            },
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DEFAULT_ID_TAG: "default_id_tag_not_authorized"}
+
+
 async def test_user_flow_duplicate_host_port_aborts(hass: HomeAssistant) -> None:
     """A second entry for the same host:port aborts instead of creating a duplicate."""
     existing = MockConfigEntry(
@@ -87,8 +161,11 @@ async def test_user_flow_duplicate_host_port_aborts(hass: HomeAssistant) -> None
     assert result["reason"] == "already_configured"
 
 
-async def test_options_flow_round_trip(hass: HomeAssistant, mock_app_start_stop: None) -> None:
+async def test_options_flow_round_trip(hass: HomeAssistant, mock_app_start_stop: None, tmp_path) -> None:
     """The options step is pre-filled with the entry's current values and can be changed."""
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text('{"idTags": {"NEWTAG": {}}}', encoding="utf-8")
+
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="OCCP (0.0.0.0:9500)",
@@ -104,7 +181,9 @@ async def test_options_flow_round_trip(hass: HomeAssistant, mock_app_start_stop:
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
 
-    result = await hass.config_entries.options.async_configure(result["flow_id"], {CONF_DEFAULT_ID_TAG: "NEWTAG"})
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_AUTHORIZATION_FILE: str(auth_file), CONF_DEFAULT_ID_TAG: "NEWTAG"}
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_DEFAULT_ID_TAG] == "NEWTAG"
 
@@ -131,6 +210,53 @@ async def test_options_flow_invalid_authorization_file_recovers(
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_AUTHORIZATION_FILE: "invalid_authorization_file"}
     assert entry.options[CONF_AUTHORIZATION_FILE] == ""
+
+
+async def test_options_flow_authorization_file_structural_errors_recover(
+    hass: HomeAssistant, mock_app_start_stop: None, tmp_path
+) -> None:
+    """A syntactically valid but structurally wrong authorization file is a form error, not a crash."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text('{"idTags": {"TAG1": "not-an-object"}}', encoding="utf-8")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_AUTHORIZATION_FILE: str(bad_file)}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_AUTHORIZATION_FILE: "invalid_authorization_file"}
+
+
+async def test_options_flow_default_id_tag_without_authorization_file_rejected(
+    hass: HomeAssistant, mock_app_start_stop: None
+) -> None:
+    """A default idTag with no authorization file at all would never be accepted -- reject it up front."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {CONF_DEFAULT_ID_TAG: "TAG1"})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DEFAULT_ID_TAG: "default_id_tag_not_authorized"}
 
 
 async def test_migrate_entry_moves_options_out_of_data(

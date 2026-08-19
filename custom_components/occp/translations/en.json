@@ -20,7 +20,8 @@
     },
     "error": {
       "port_in_use": "The port is already in use. Please choose a different port.",
-      "invalid_authorization_file": "The file is not readable or does not contain valid JSON."
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON.",
+      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired."
     },
     "abort": {
       "already_configured": "This Central System instance (host/port) is already configured."
@@ -40,7 +41,8 @@
       }
     },
     "error": {
-      "invalid_authorization_file": "The file is not readable or does not contain valid JSON."
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON.",
+      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired."
     }
   },
   "entity": {

@@ -26,6 +26,7 @@ from custom_components.occp.const import (
     DEFAULT_PORT,
     DOMAIN,
 )
+from custom_components.occp.core.domain.authorization import IdTagStatus
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 
 from .options_flow import OPTIONS_SCHEMA, OccpOptionsFlow
@@ -63,15 +64,24 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason="already_configured")
 
             authorization_file = user_input.get(CONF_AUTHORIZATION_FILE, "")
+            default_id_tag = user_input.get(CONF_DEFAULT_ID_TAG, "")
             try:
                 await self.hass.async_add_executor_job(_try_bind_port, host, port)
             except OSError:
                 errors["port"] = "port_in_use"
             if not errors and authorization_file:
                 try:
-                    await self.hass.async_add_executor_job(validate_authorization_file, authorization_file)
+                    provider = await self.hass.async_add_executor_job(validate_authorization_file, authorization_file)
                 except OSError, ValueError:
                     errors[CONF_AUTHORIZATION_FILE] = "invalid_authorization_file"
+                else:
+                    if default_id_tag and provider.authorize(default_id_tag).status is not IdTagStatus.ACCEPTED:
+                        errors[CONF_DEFAULT_ID_TAG] = "default_id_tag_not_authorized"
+            elif not errors and default_id_tag:
+                # Ein Default-idTag (REQ-0020) ohne Autorisierungsdatei würde nie akzeptiert
+                # (leere Liste lehnt alles ab, siehe StaticAuthorizationProvider.authorize) --
+                # nur ein akzeptierter Eintrag darf als Default gespeichert werden.
+                errors[CONF_DEFAULT_ID_TAG] = "default_id_tag_not_authorized"
             if not errors:
                 await self.async_set_unique_id(str(uuid4()))
                 return self.async_create_entry(
