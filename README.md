@@ -134,6 +134,13 @@ point as a whole, never gets its own entities).
 
 ## Custom Services
 
+`set_power_limit`, `clear_power_limit`, `authorize_id_token`, and the state/current-power/
+effective-power-limit/availability entities above together form a documented interface meant for a
+separate load-management integration to build against — see
+[`docs/development/INTEROP_CONTRACT.md`](docs/development/INTEROP_CONTRACT.md) if that's you. The
+four services below it (`reset`, `unlock_connector`, `get_configuration`, `change_configuration`)
+are useful operational actions but are not part of that contract.
+
 ### `occp.set_power_limit`
 
 Set a connector's charging power limit.
@@ -167,6 +174,50 @@ data:
   id_token: TAG001
 ```
 
+### `occp.reset`
+
+Soft- or hard-reset the charge point (targets the charge-point device itself, not a connector).
+
+```yaml
+service: occp.reset
+data:
+  device_id: <charge point device id>
+  reset_type: Soft # or Hard
+```
+
+### `occp.unlock_connector`
+
+Ask the charge point to unlock a connector.
+
+```yaml
+service: occp.unlock_connector
+data:
+  device_id: <connector device id>
+```
+
+### `occp.get_configuration`
+
+Read one or more OCPP configuration keys from the charge point (all of them if `keys` is omitted).
+
+```yaml
+service: occp.get_configuration
+data:
+  device_id: <charge point device id>
+  keys: [HeartbeatInterval] # optional
+```
+
+### `occp.change_configuration`
+
+Set a single OCPP configuration key on the charge point.
+
+```yaml
+service: occp.change_configuration
+data:
+  device_id: <charge point device id>
+  key: HeartbeatInterval
+  value: "300"
+```
+
 ## Configuration Options
 
 ### During Setup
@@ -178,7 +229,9 @@ data:
 | Authorization File | No       | Path to a JSON file with a static idTag allow-list               |
 | Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command     |
 
-Settings cannot currently be changed after setup - remove and re-add the integration to change them.
+Host and port are fixed once the entry is created (changing the listen address needs a new entry).
+Authorization File and Default idTag can be changed afterwards via **Settings** → **Devices &
+Services** → **OCCP** → **Configure** — this reloads the entry to apply the change.
 
 ## Troubleshooting
 
@@ -297,14 +350,14 @@ You'll need these installed locally:
 >   1.6 core was built, reviewed, and debugged largely by AI agents under the maintainer's direction
 > - **Human review:** partial — the maintainer directed the work and reviewed it at a high level;
 >   line-by-line review of every change has not been performed
-> - **Automated tests:** a minimal `pytest-homeassistant-custom-component` setup/unload smoke test
->   exists; the OCPP core's own test suite is not yet part of this repository
+> - **Automated tests:** a `pytest-homeassistant-custom-component` suite covers the config/options
+>   flow and migration, the coordinator, sensor/switch entity behavior, and all 7 services
+>   (including their `ServiceValidationError` paths); the OCPP core's own test suite is not yet part
+>   of this repository
 > - **Real-device or service testing:** exercised end-to-end against an OCPP 1.6 charge point
 >   simulator ([shiv3/ocpp-cp-simulator](https://github.com/shiv3/ocpp-cp-simulator)), not yet
 >   against physical charging hardware
-> - **Maturity and known limitations:** pre-1.0, actively evolving. `Reset`, `UnlockConnector`,
->   `GetConfiguration`, and `ChangeConfiguration` are implemented in the core but not yet exposed as
->   Home Assistant services. No options/reconfigure flow yet.
+> - **Maturity and known limitations:** pre-1.0, actively evolving. No reauth or discovery flow yet.
 >
 > If you encounter unexpected behavior, please [open an issue](../../issues) on GitHub.
 

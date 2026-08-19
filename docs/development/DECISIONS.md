@@ -20,97 +20,163 @@ Each decision is documented with:
 
 ## Decision Log
 
-### Use DataUpdateCoordinator for All Data Fetching
+### Thin coordinator: hold the last event, not a data snapshot
 
-**Date:** 2025-11-29 (Template initialization)
+**Date:** 2026-08-18
 
-**Context:** The integration needs to fetch data from an external API and share it with multiple entities. Home Assistant provides several patterns for this.
+**Context:** OCCP's standalone core (`core/`) already has its own push-based, poll-free domain
+model — `QueryService`/`CommandService` are free, always-current in-memory reads with no I/O.
+`AGENTS.md`'s Home Assistant rule ("entities read `coordinator.data`, never reach past it") is
+written for the common case where the coordinator's fetch _is_ the expensive operation worth
+sharing across entities. Here it is not: there is nothing to fetch, and nothing to poll
+(`iot_class: local_push`).
 
-**Decision:** Use `DataUpdateCoordinator` from `homeassistant.helpers.update_coordinator` as the central data management component.
+**Decision:** `OccpCoordinator(DataUpdateCoordinator[StateChangeEvent | None])`,
+`update_interval=None`. The coordinator holds only the most recently published `StateChangeEvent`,
+not a materialized copy of any domain state. Entities extend `CoordinatorEntity[OccpCoordinator]`
+for lifecycle/`available` plumbing and re-render triggers, but read `QueryService`/
+`CommandService` directly in their property getters — exactly as they would without a coordinator
+at all.
 
 **Rationale:**
 
-- Provides built-in support for update intervals and error handling
-- Automatic retry with exponential backoff
-- Shared data access prevents duplicate API calls
-- Standard pattern recommended by Home Assistant
-- Entities automatically become unavailable when coordinator fails
+- Materializing a second `.data` snapshot from `QueryService` would just be a synchronization
+  liability (two copies of the same state, no benefit) with no read ever actually reading it.
+- The event still buys the one thing a coordinator is for here: entities that only care about
+  their own connector (e.g. `OccpEffectivePowerLimitSensor`) can filter by `event.connector_id`
+  before doing an OCPP round trip (`GetCompositeSchedule`), instead of refreshing on every event
+  for every connector.
+- Confirmed explicitly with the maintainer as a deliberate, narrower reading of the "coordinator
+  data only" rule rather than the "thick" alternative (copy every read into `.data`).
 
 **Consequences:**
 
-- All entities must inherit from `CoordinatorEntity`
-- Single update interval applies to all entities
-- Data is fetched even if no entities are enabled
-- Coordinator manages entity lifecycle and availability
+- A future contributor reading `AGENTS.md`'s rule literally may expect entities to read
+  `coordinator.data` for their values — they do not, by design. This document and
+  `ARCHITECTURE.md`'s "Push, not poll" section exist specifically so that surprise resolves
+  quickly instead of triggering an incorrect "fix".
+- `coordinator.async_add_listener()` is still the mechanism `_SensorManager`/`_SwitchManager` use
+  to detect newly-appeared connectors/measurands — only what each listener _does_ with the event
+  differs from the polling-coordinator default.
 
 ---
 
-### Separate API Client from Coordinator
+### Device-registration listener must subscribe before the coordinator
 
-**Date:** 2025-11-29 (Template initialization)
+**Date:** 2026-08-18
 
-**Context:** The coordinator needs to fetch data, but business logic should be separated from data transport.
+**Context:** `__init__.py` originally constructed `OccpCoordinator` (which subscribes on
+`app.query_service`) before subscribing its own charge-point device-registration listener.
+`EventBus.publish()` calls listeners in subscription order, and
+`DataUpdateCoordinator.async_set_updated_data()` triggers the coordinator's _own_ listeners
+(`_SensorManager`/`_SwitchManager`, which create connector devices with `via_device` pointing at
+the charge-point device) synchronously, inside that same call. On a charge point's very first
+event this meant a connector device could be registered before its parent charge-point device
+existed — a `homeassistant.helpers.frame` deprecation warning, not a hard error, so it went
+unnoticed through several rounds of `--level error`-only log checks until a coordinator/entity
+test caught it directly.
 
-**Decision:** Implement API communication in separate `api/client.py` module, coordinator only orchestrates updates.
+**Decision:** Subscribe the device-registration listener on `app.query_service` before
+constructing `OccpCoordinator` in `async_setup_entry()`.
 
-**Rationale:**
+**Rationale:** Subscription order is the only lever available — `EventBus` has no priority
+concept, and adding one for a single ordering dependency would be over-engineering for a
+project this size.
 
-- Separation of concerns: transport vs. orchestration
-- Easier to test API client in isolation
-- Simpler to swap API implementation if needed
-- Clearer error handling boundaries
-
-**Consequences:**
-
-- Additional abstraction layer
-- Coordinator depends on API client
-- API client raises custom exceptions for error translation
-
----
-
-### Platform-Specific Directories
-
-**Date:** 2025-11-29 (Template initialization)
-
-**Context:** Integration supports multiple platforms (sensor, binary_sensor, switch, etc.).
-
-**Decision:** Each platform gets its own directory with individual entity files.
-
-**Rationale:**
-
-- Clear organization as integration grows
-- Easier to find specific entity implementations
-- Supports multiple entities per platform cleanly
-- Follows Home Assistant Core pattern
-
-**Consequences:**
-
-- More files/directories than single-file approach
-- Platform `__init__.py` must import and register entities
-- Slightly more initial setup overhead
+**Consequences:** Anyone adding a third `app.query_service.subscribe()` call in `__init__.py`
+that depends on the device registry needs to keep it ahead of the coordinator too; anyone adding
+one that does not depend on it can go anywhere.
 
 ---
 
-### EntityDescription for Static Metadata
+### `unique_id` is a random UUID, not host:port
 
-**Date:** 2025-11-29 (Template initialization)
+**Date:** 2026-08-17
 
-**Context:** Entities have static metadata (name, icon, device class) that doesn't change.
+**Context:** The config flow originally used `host:port` as the config entry's `unique_id` and
+relied on `_abort_if_unique_id_configured()` to reject duplicates. `AGENTS.md`'s project rule is
+explicit: a unique ID must be a serial number, MAC, device ID, or account ID — never a network
+address, since addresses can change or be reused across genuinely different setups.
 
-**Decision:** Use `EntityDescription` dataclasses to define static entity metadata.
+**Decision:** `unique_id = str(uuid4())`, generated once at entry creation. Duplicate
+host:port combinations are now caught explicitly via `_host_port_already_configured()` (a plain
+scan of `self._async_current_entries()` comparing `entry.data`), instead of relying on
+`unique_id`.
 
-**Rationale:**
+**Consequences:** The duplicate-detection logic is now bespoke instead of the standard
+`_abort_if_unique_id_configured()` helper — documented at the call site in
+`config_flow_handler/config_flow.py` so it isn't mistaken for an oversight.
 
-- Declarative and easy to read
-- Type-safe with dataclasses
-- Recommended Home Assistant pattern
-- Separates static configuration from dynamic behavior
+---
 
-**Consequences:**
+### `entry.data` vs. `entry.options`: only connection-critical fields in `data`
 
-- Each entity type needs an EntityDescription
-- Dynamic entities need custom handling
-- Static and dynamic properties clearly separated
+**Date:** 2026-08-17
+
+**Context:** The listen host/port are needed to establish the WebSocket server and cannot be
+changed without disruption; the authorization file path and default idTag are operational
+settings a user may reasonably want to change without recreating the entry.
+
+**Decision:** `host`/`port` live in `entry.data`. `authorization_file`/`default_id_tag` live in
+`entry.options`, editable via `OccpOptionsFlow` without removing the entry. Changing them fires an
+options-update listener that reloads the entry (`CentralSystemApp` builds both from the loaded
+config once, at setup).
+
+**Consequences:** Entries created before this change needed a migration
+(`VERSION 1` → `MINOR_VERSION 2`, `async_migrate_entry()` moves the two option-shaped keys from
+`data` to `options`).
+
+---
+
+### Expose Reset/UnlockConnector/GetConfiguration/ChangeConfiguration as HA services
+
+**Date:** 2026-08-17
+
+**Context:** `core/`'s `CommandService` and the standalone console already supported these four
+OCPP calls, but only the three REQ-0035 interop-contract capabilities
+(`set_power_limit`/`clear_power_limit`/`authorize_id_token`) were exposed as Home Assistant
+services. This is a scope decision, not a REQ-0035 requirement — the interop contract does not
+call for these four (see [INTEROP_CONTRACT.md](./INTEROP_CONTRACT.md)); a separate load-management
+integration should not expect them to be part of that stable surface.
+
+**Decision:** Add `reset`, `unlock_connector`, `get_configuration`, `change_configuration` as
+ordinary Home Assistant services, following the same `ServiceValidationError`-on-bad-input pattern
+as the three interop services.
+
+**Rationale:** These are useful operational actions (remote reset, connector unlock, reading/
+writing OCPP configuration keys) that already existed one layer down; not exposing them would have
+meant reimplementing them later for no reason.
+
+**Consequences:** `reset`/`get_configuration`/`change_configuration` target the charge-point
+device itself; `unlock_connector` targets a connector device — the two device-scoped resolvers in
+`service_actions/_resolvers.py` reject the wrong kind of device explicitly rather than silently
+misrouting the call.
+
+---
+
+### No `EntityDescription`/`value_fn` pattern
+
+**Date:** 2026-08-18 (documented; the entities themselves predate the restructuring)
+
+**Context:** The blueprint template's usual sensor pattern is a shared entity class parameterized
+by an `EntityDescription.value_fn` per logical group, with per-group files holding descriptions
+only (see `ha-entity-platform`).
+
+**Decision:** Each OCCP entity (`OccpChargePointStateSensor`, `OccpCurrentPowerSensor`,
+`OccpEffectivePowerLimitSensor`, `OccpMeasurandSensor`, and the two switches) is its own class with
+its own `native_value`/`is_on` logic, sharing only `OccpConnectorEntity` (device info, unique ID,
+`available`).
+
+**Rationale:** `value_fn` earns its keep when several entities are otherwise a copy of each other
+with a different lookup — that isn't true here. `OccpEffectivePowerLimitSensor` makes its own OCPP
+call and caches the result; `OccpMeasurandSensor` is dynamically instantiated per reported
+measurand with per-instance unit/device-class resolution; `OccpChargePointStateSensor` maps a raw
+OCPP status through a five-value model plus REQ-0035 discovery attributes. Forcing these into one
+parameterized class would make the parameterization the complex part.
+
+**Consequences:** Adding a platform-standard `EntityDescription` later (e.g. if OCCP grows several
+genuinely interchangeable sensors) is still open — this decision only covers the entities that
+exist today.
 
 ---
 
@@ -120,19 +186,24 @@ Each decision is documented with:
 
 **Status:** Not yet implemented
 
-Consider implementing state restoration for switches and configurable settings to maintain state across Home Assistant restarts when the external device is unavailable.
+`OccpAvailabilitySwitch`'s `_last_change_status` attribute (the pending `ChangeAvailability`
+status) does not survive a Home Assistant restart. Low priority — the connector's actual on/off
+state always comes fresh from the charge point's next `StatusNotification`.
 
-### Multi-Device Support
+### Multi-Connector Charge Points at Scale
 
-**Status:** Not yet implemented
+**Status:** Supported, not stress-tested
 
-Current architecture assumes single device per config entry. If multi-device support is needed, coordinator data structure will need redesign to map device ID → data.
+The architecture (one device per connector, dynamic entity creation) has no fixed connector-count
+assumption, but has only been exercised against the `ocpp-cp-simulator` with a handful of
+connectors per charge point, not a large fleet.
 
-### Polling vs. Push
+### Porting `core/`'s own test suite
 
-**Status:** Uses polling
+**Status:** Blocked
 
-Currently implements polling-based updates. If the API supports webhooks or WebSocket, consider implementing push-based updates for real-time responsiveness.
+The standalone core's ~210 tests live in the separate OCCP source repository and are not reachable
+from this devcontainer. Tracked, not attempted.
 
 ---
 

@@ -3,80 +3,111 @@
 This page provides ready-to-use examples for automations, dashboards, and blueprints
 with the OCCP - OCPP 1.6 Central System custom integration.
 
-Replace entity IDs like `sensor.device_name_*` with your actual entity IDs after
-setting up the integration.
+Replace entity/device IDs like `sensor.ladepunkt_1` and `<connector device id>` with your actual
+ones after setting up the integration — see [GETTING_STARTED.md](./GETTING_STARTED.md) for how
+devices/entities are named.
 
 ## Automations
 
-### Notify when a sensor exceeds a threshold
+### Notify when a connector faults
 
 ```yaml
 automation:
-  - alias: "Alert when sensor is high"
+  - alias: "Alert on connector fault"
     trigger:
-      - trigger: numeric_state
-        entity_id: sensor.device_name_air_quality
-        above: 100
+      - trigger: state
+        entity_id: sensor.ladepunkt_1
+        to: "error"
     action:
       - action: notify.notify
         data:
-          title: "Air quality alert"
-          message: "Sensor value exceeded 100!"
+          title: "Charge point fault"
+          message: >-
+            {{ state_attr(trigger.entity_id, 'friendly_name') }}:
+            {{ state_attr(trigger.entity_id, 'error_code') }}
 ```
 
-### Turn on a switch when connectivity is lost
+### Turn off a load when charging starts
 
 ```yaml
 automation:
-  - alias: "React to connectivity loss"
+  - alias: "Pause dishwasher while charging"
     trigger:
       - trigger: state
-        entity_id: binary_sensor.device_name_connectivity
-        to: "off"
-        for:
-          minutes: 5
+        entity_id: sensor.ladepunkt_1
+        to: "charging"
     action:
       - action: switch.turn_off
         target:
-          entity_id: switch.device_name_switch
+          entity_id: switch.dishwasher
 ```
 
-### Call a service action on schedule
+### Limit charging power on a schedule
 
 ```yaml
 automation:
-  - alias: "Refresh the data every morning"
+  - alias: "Reduce charging power overnight"
     trigger:
       - trigger: time
-        at: "03:00:00"
+        at: "22:00:00"
     action:
-      - action: occp.refresh_data
+      - action: occp.set_power_limit
         data:
-          config_entry_id: 01JG3T2Q6Z9K4V8P0N5R7X2M1A
+          device_id: <connector device id>
+          limit_w: 3700
+
+  - alias: "Restore charging power in the morning"
+    trigger:
+      - trigger: time
+        at: "06:00:00"
+    action:
+      - action: occp.clear_power_limit
+        data:
+          device_id: <connector device id>
 ```
 
-### Use a blueprint for threshold alerts
+This is the pattern a dedicated load-management integration would automate dynamically instead of
+on a fixed schedule — see [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) if you're
+building one.
+
+### Start a transaction remotely
+
+```yaml
+automation:
+  - alias: "Start charging when I arrive home"
+    trigger:
+      - trigger: zone
+        entity_id: person.me
+        zone: zone.home
+        event: enter
+    condition:
+      - condition: state
+        entity_id: sensor.ladepunkt_1
+        state: "not_connected"
+        # only fires once a cable is actually plugged in, via the "ready" state below --
+        # adjust to your own workflow
+    action:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.ladepunkt_1
+```
+
+### Use a blueprint for connector-error alerts
 
 Save this as a blueprint file and import it in Home Assistant:
 
 ```yaml
 blueprint:
-  name: OCCP - OCPP 1.6 Central System — Threshold Alert
-  description: Send a notification when a sensor exceeds a configurable threshold.
+  name: OCCP Connector Error Alert
+  description: Send a notification when a connector's state becomes "error".
   domain: automation
   input:
-    sensor_entity:
-      name: Sensor
+    state_entity:
+      name: Charge Point State sensor
       selector:
         entity:
           domain: sensor
           integration: occp
-    threshold:
-      name: Threshold value
-      selector:
-        number:
-          min: 0
-          max: 1000
     notify_target:
       name: Notification service
       default: notify.notify
@@ -84,76 +115,75 @@ blueprint:
         text:
 
 trigger:
-  - trigger: numeric_state
-    entity_id: !input sensor_entity
-    above: !input threshold
+  - trigger: state
+    entity_id: !input state_entity
+    to: "error"
 
 action:
   - action: !input notify_target
     data:
       message: >-
-        {{ state_attr(trigger.entity_id, 'friendly_name') }}
-        exceeded {{ threshold }} (current value: {{ trigger.to_state.state }}).
+        {{ state_attr(trigger.entity_id, 'friendly_name') }} reported an error:
+        {{ state_attr(trigger.entity_id, 'error_code') }}
 ```
 
 ## Dashboard Cards
 
-### Sensor value card
-
-```yaml
-type: sensor
-entity: sensor.device_name_air_quality
-name: Air Quality
-graph: line
-```
-
-### Device summary — entities card
+### Connector status card
 
 ```yaml
 type: entities
-title: My Device
+title: Ladepunkt 1
 entities:
-  - entity: sensor.device_name_air_quality
-    name: Air Quality
-  - entity: binary_sensor.device_name_connectivity
-    name: Connected
-  - entity: binary_sensor.device_name_filter
-    name: Filter Status
-  - entity: switch.device_name_switch
-    name: Power
-  - entity: select.device_name_fan_speed
-    name: Fan Speed
-  - entity: number.device_name_threshold
-    name: Threshold
+  - entity: sensor.ladepunkt_1
+    name: State
+  - entity: sensor.ladepunkt_1_power
+    name: Current Power
+  - entity: switch.ladepunkt_1
+    name: Charging
+  - entity: switch.ladepunkt_1_2
+    name: Available
 ```
 
-### Status badge — multiple entities
+### Power graph
+
+```yaml
+type: sensor
+entity: sensor.ladepunkt_1_power
+name: Charging Power
+graph: line
+```
+
+### Multi-connector glance
 
 ```yaml
 type: glance
-title: Device Status
+title: Charge Points
 entities:
-  - entity: binary_sensor.device_name_connectivity
-    name: Online
-  - entity: sensor.device_name_air_quality
-    name: Air Quality
-  - entity: binary_sensor.device_name_filter
-    name: Filter
+  - entity: sensor.ladepunkt_1
+    name: Connector 1
+  - entity: sensor.ladepunkt_2
+    name: Connector 2
 show_state: true
 ```
 
-### History graph
+### Energy history
 
 ```yaml
 type: history-graph
-title: Air Quality (last 24 h)
+title: Energy Delivered (last 24 h)
 entities:
-  - entity: sensor.device_name_air_quality
+  - entity: sensor.ladepunkt_1_energy_active_import_register
 hours_to_show: 24
 ```
 
+The exact entity ID for the energy measurand depends on which `Energy.*` measurand your charge
+point actually reports — check **Settings** → **Devices & Services** → **Entities** after your
+first transaction.
+
 ## Related Documentation
 
-- [Configuration Reference](./CONFIGURATION.md) - All configuration options
+- [Configuration Reference](./CONFIGURATION.md) - All configuration options and the full service reference
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
+- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCCP
 - [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues) - Report problems

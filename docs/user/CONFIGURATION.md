@@ -8,40 +8,45 @@ This document describes all configuration options and settings available in the 
 
 These options are configured during initial setup via the Home Assistant UI.
 
-#### Connection Settings
+| Option                 | Type    | Required | Default   | Description                                                     |
+| ---------------------- | ------- | -------- | --------- | --------------------------------------------------------------- |
+| **Host**               | string  | Yes      | `0.0.0.0` | Bind address the OCPP WebSocket server listens on               |
+| **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                       |
+| **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = accept all |
+| **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start             |
 
-| Option      | Type    | Required | Default | Description                                  |
-| ----------- | ------- | -------- | ------- | -------------------------------------------- |
-| **Host**    | string  | Yes      | -       | Hostname or IP address of the device/service |
-| **Port**    | integer | No       | 8080    | Connection port                              |
-| **API Key** | string  | Yes\*    | -       | Authentication key or token                  |
-| **Use SSL** | boolean | No       | false   | Enable HTTPS connection                      |
+Host and port are test-bound during setup — a port already in use is rejected immediately with a
+clear error instead of failing later.
 
-\*Required if the device/service requires authentication.
+### Authorization File Format
 
-#### Update Settings
+```json
+{
+  "idTags": {
+    "ABC123": { "blocked": false, "parentIdTag": null, "expiryDate": null },
+    "DEF456": { "blocked": true }
+  }
+}
+```
 
-| Option              | Type              | Required | Default  | Description                                         |
-| ------------------- | ----------------- | -------- | -------- | --------------------------------------------------- |
-| **Update Interval** | integer (seconds) | No       | 300      | How often to poll for updates (minimum: 30 seconds) |
-| **Name**            | string            | No       | "Device" | Friendly name for the integration instance          |
+Every field except the key itself is optional. `blocked: true` rejects the tag outright;
+`expiryDate` (ISO 8601) rejects it once past. Leave the authorization file unset to accept every
+idTag without checking.
 
 ### Options Flow (Reconfiguration)
 
-After initial setup, you can modify settings:
+The **Authorization File** and **Default idTag** can be changed after setup, without recreating
+the integration — the entry reloads automatically to apply the change:
 
 1. Go to **Settings** → **Devices & Services**
 2. Find "OCCP - OCPP 1.6 Central System"
 3. Click **Configure**
-4. Modify settings
+4. Modify the authorization file path or default idTag
 5. Click **Submit**
 
-**Available options:**
-
-- Update interval
-- Name/identifier
-- Connection timeout
-- Additional features (device-specific)
+**Host and port cannot be changed this way** — they are fixed once the entry is created. To listen
+on a different address/port, add a new config entry (see "Multiple Instances" below) and remove
+the old one.
 
 ## Entity Configuration
 
@@ -58,7 +63,6 @@ Customize entities via the UI or `configuration.yaml`:
    - Entity ID
    - Name
    - Icon
-   - Device class (for applicable entities)
    - Area assignment
 
 #### Via configuration.yaml
@@ -66,151 +70,199 @@ Customize entities via the UI or `configuration.yaml`:
 ```yaml
 homeassistant:
   customize:
-    sensor.device_name_sensor:
-      friendly_name: "Custom Sensor Name"
-      icon: mdi:custom-icon
-      unit_of_measurement: "units"
+    sensor.ladepunkt_1_power:
+      friendly_name: "Wallbox Power"
 ```
 
 ### Disabling Entities
 
-If you don't need certain entities:
+If you don't need certain entities (e.g. a rarely-reported measurand sensor):
 
 1. Go to **Settings** → **Devices & Services** → **Entities**
 2. Find the entity
-3. Click it, then click **Settings** icon
+3. Click it, then click the **Settings** icon
 4. Toggle **Enable entity** off
 
 Disabled entities won't update or consume resources.
 
 ## Services
 
-The integration provides the following services:
+The integration provides 7 services. `device_id` fields expect the connector or charge-point
+device (as noted per service) — resolve it via **Settings** → **Devices & Services** → the device,
+or the device selector Home Assistant's service UI offers for these fields automatically. See
+[INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) for the full machine-readable contract
+if you're building another integration against these.
 
-### `occp.refresh_data`
+### `occp.set_power_limit`
 
-Fetch the current device state immediately instead of waiting for the next poll.
+Set a connector's charging power limit.
 
-**Service data:**
-
-| Parameter         | Type   | Required | Description                        |
-| ----------------- | ------ | -------- | ---------------------------------- |
-| `config_entry_id` | string | Yes      | The configuration entry to refresh |
-
-The action returns `refreshed_at`, `success` and `value_count`, so an automation can react to
-whether the refresh actually produced data.
-
-**Example:**
+| Field       | Required | Description                |
+| ----------- | -------- | -------------------------- |
+| `device_id` | Yes      | Connector device           |
+| `limit_w`   | Yes      | Power limit in watts (> 0) |
+| `phases`    | No       | Number of phases (1–3)     |
 
 ```yaml
-action: occp.refresh_data
+action: occp.set_power_limit
 data:
-  config_entry_id: 01JG3T2Q6Z9K4V8P0N5R7X2M1A
+  device_id: <connector device id>
+  limit_w: 7400
+  phases: 3
+```
+
+### `occp.clear_power_limit`
+
+Remove a connector's charging power limit.
+
+```yaml
+action: occp.clear_power_limit
+data:
+  device_id: <connector device id>
+```
+
+### `occp.authorize_id_token`
+
+Check whether an idTag is authorized, without starting a transaction.
+
+```yaml
+action: occp.authorize_id_token
+data:
+  charge_point_id: CP001
+  id_token: TAG001
+```
+
+### `occp.reset`
+
+Soft- or hard-reset the charge point.
+
+```yaml
+action: occp.reset
+data:
+  device_id: <charge point device id>
+  reset_type: Soft
+```
+
+### `occp.unlock_connector`
+
+Ask the charge point to unlock a connector.
+
+```yaml
+action: occp.unlock_connector
+data:
+  device_id: <connector device id>
+```
+
+### `occp.get_configuration`
+
+Read one or more OCPP configuration keys (all of them if `keys` is omitted).
+
+```yaml
+action: occp.get_configuration
+data:
+  device_id: <charge point device id>
+  keys: [HeartbeatInterval]
+```
+
+### `occp.change_configuration`
+
+Set a single OCPP configuration key.
+
+```yaml
+action: occp.change_configuration
+data:
+  device_id: <charge point device id>
+  key: HeartbeatInterval
+  value: "300"
 ```
 
 ### Using Services in Automations
 
 ```yaml
 automation:
-  - alias: "Refresh at sunset"
+  - alias: "Limit power overnight"
     trigger:
-      - trigger: sun
-        event: sunset
+      - trigger: time
+        at: "22:00:00"
     action:
-      - action: occp.refresh_data
+      - action: occp.set_power_limit
         data:
-          config_entry_id: 01JG3T2Q6Z9K4V8P0N5R7X2M1A
+          device_id: <connector device id>
+          limit_w: 3700
 ```
 
 ## Advanced Configuration
 
 ### Multiple Instances
 
-You can add multiple instances of this integration for different devices:
+You can add multiple config entries, each running its own independent WebSocket server on a
+different port — useful for one listen port per site, or to separate charge points by network
+segment:
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "OCCP - OCPP 1.6 Central System"
-4. Configure with different connection details
+4. Configure with a different host/port
 
-Each instance creates separate entities with unique entity IDs.
+Each instance's devices/entities are entirely independent.
 
 ### Network Configuration
 
-If the device is on a different network or behind a firewall:
+Charge points connect _to_ Home Assistant, not the other way around:
 
-- Ensure ports are open (default: 8080)
-- Configure port forwarding if needed
-- Consider VPN for remote access
-- Some devices may require static IP addresses
+- Ensure the configured port is reachable from the charge point (open the port on Home Assistant's
+  host firewall, forward it if the charge point is on a different network)
+- The charge point must be configured with `ws://<home-assistant-host>:<port>/<chargePointId>` and
+  subprotocol `ocpp1.6` — OCCP does not support `wss://` directly (put a reverse proxy in front if
+  the charge point requires TLS)
 
-### Polling Behavior
+### Push Behavior
 
-The integration uses polling to fetch updates:
-
-- **Minimum interval:** 30 seconds (prevents overloading the device)
-- **Recommended interval:** 5 minutes (default)
-- **Longer intervals:** Save resources but reduce responsiveness
-
-Adjust based on your needs:
-
-- Real-time monitoring: 30-60 seconds
-- Regular updates: 5 minutes
-- Slow-changing values: 15-30 minutes
+OCCP does **not** poll — `iot_class: local_push`. Entities update the moment a charge point sends
+a relevant OCPP message (`StatusNotification`, `MeterValues`, ...); there is no update interval to
+configure and nothing to tune for responsiveness.
 
 ## Diagnostic Data
 
-The integration provides diagnostic data for troubleshooting:
-
-1. Go to **Settings** → **Devices & Services**
-2. Find "OCCP - OCPP 1.6 Central System"
-3. Click on the device
-4. Click **Download Diagnostics**
-
-Diagnostic data includes:
-
-- Connection status
-- Last update timestamp
-- API response data
-- Entity states
-- Error history
-
-**Privacy note:** Diagnostic data may contain sensitive information. Review before sharing.
+Not yet implemented — this integration does not currently provide a "Download Diagnostics" export.
+Use debug logging (see [GETTING_STARTED.md](./GETTING_STARTED.md#debug-logging)) for
+troubleshooting in the meantime.
 
 ## Blueprints
 
 The integration works with Home Assistant Blueprints for reusable automations:
 
-### Example Blueprint
+### Example Blueprint — Connector Error Alert
 
 ```yaml
 blueprint:
-  name: OCCP - OCPP 1.6 Central System Alert
-  description: Send notification when sensor exceeds threshold
+  name: OCCP Connector Error Alert
+  description: Notify when a connector's state becomes "error".
   domain: automation
   input:
-    sensor_entity:
-      name: Sensor
+    state_entity:
+      name: Charge Point State sensor
       selector:
         entity:
           domain: sensor
           integration: occp
-    threshold:
-      name: Threshold
+    notify_target:
+      name: Notification service
+      default: notify.notify
       selector:
-        number:
-          min: 0
-          max: 100
+        text:
 
 trigger:
-  - trigger: numeric_state
-    entity_id: !input sensor_entity
-    above: !input threshold
+  - trigger: state
+    entity_id: !input state_entity
+    to: "error"
 
 action:
-  - action: notify.notify
+  - action: !input notify_target
     data:
-      message: "Sensor exceeded threshold!"
+      message: >-
+        {{ state_attr(trigger.entity_id, 'friendly_name') }} reported an error:
+        {{ state_attr(trigger.entity_id, 'error_code') }}
 ```
 
 ## Configuration Examples
@@ -224,8 +276,8 @@ See [EXAMPLES.md](./EXAMPLES.md) for complete automation and dashboard examples.
 If the integration fails to load after configuration:
 
 1. Check Home Assistant logs for errors
-2. Verify connection details are correct
-3. Test connectivity from Home Assistant to the device
+2. Confirm the configured port isn't already in use by something else
+3. Verify the authorization file path (if set) is readable by Home Assistant
 4. Try removing and re-adding the integration
 
 ### Options Don't Save
@@ -233,12 +285,12 @@ If the integration fails to load after configuration:
 If configuration changes aren't persisted:
 
 1. Check for validation errors in the UI
-2. Ensure values are within allowed ranges
-3. Review logs for detailed error messages
-4. Try restarting Home Assistant
+2. Review logs for detailed error messages
+3. Try restarting Home Assistant
 
 ## Related Documentation
 
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
 - [Examples](./EXAMPLES.md) - Automation and dashboard examples
+- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCCP
 - [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues) - Report problems

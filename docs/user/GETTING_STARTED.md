@@ -2,11 +2,18 @@
 
 This guide will help you install and set up the OCCP - OCPP 1.6 Central System custom integration for Home Assistant.
 
+OCCP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server
+that charge points connect _to_. There is no external cloud service or device IP to poll — Home
+Assistant is the server, and charge points are the clients.
+
 ## Prerequisites
 
 - Home Assistant 2025.7.0 or newer
 - HACS (Home Assistant Community Store) installed
-- Network connectivity to [external service/device]
+- An OCPP 1.6 charge point (or a simulator, e.g.
+  [shiv3/ocpp-cp-simulator](https://github.com/shiv3/ocpp-cp-simulator)) that can be pointed at a
+  custom OCPP backend URL, and network connectivity from that charge point to Home Assistant
+- A free port on the Home Assistant host for OCCP's WebSocket server (default `9000`)
 
 ## Installation
 
@@ -39,56 +46,72 @@ After installation, add the integration:
 3. Search for "OCCP - OCPP 1.6 Central System"
 4. Follow the configuration steps:
 
-### Step 1: Connection Information
+### Step 1: Listen Address
 
-Enter the required connection details:
+Enter where OCCP's WebSocket server should listen for charge point connections:
 
-- **Host/IP Address:** The hostname or IP address of your device/service
-- **API Key/Token:** Your authentication credentials (if applicable)
-- **Port:** Connection port (default: 8080)
+- **Host:** The bind address (default `0.0.0.0` — every network interface)
+- **Port:** The listen port (default `9000`)
 
-Click **Submit** to test the connection.
+Home Assistant test-binds this address/port before creating the entry, so a port already in use by
+something else is rejected immediately with a clear error rather than failing later.
 
-### Step 2: Configuration Options
+### Step 2: Optional Settings
 
-Configure optional settings:
+- **Authorization File:** Path to a JSON file with a static idTag allow-list (see
+  [CONFIGURATION.md](./CONFIGURATION.md) for the format). Leave empty to accept every idTag.
+- **Default idTag:** The idTag OCCP uses when the `start_stop` switch remote-starts a transaction.
+  Required only if you plan to use that switch.
 
-- **Update Interval:** How often to poll for updates (default: 5 minutes)
-- **Name:** Friendly name for this integration instance
+Both of these can be changed later without recreating the integration — see
+[CONFIGURATION.md](./CONFIGURATION.md).
 
-Click **Submit** to complete setup.
+Click **Submit** to complete setup. Home Assistant now starts listening for charge point
+connections immediately.
+
+### Step 3: Point Your Charge Point at Home Assistant
+
+Configure your charge point's (or simulator's) OCPP backend URL to:
+
+```text
+ws://<home-assistant-host>:<port>/<chargePointId>
+```
+
+using WebSocket subprotocol `ocpp1.6`. `<chargePointId>` is whatever identity the charge point
+sends — OCCP does not require pre-registration.
 
 ## What Gets Created
 
-After successful setup, the integration creates:
+Devices and entities appear **automatically** the moment a charge point connects and sends its
+first `BootNotification` — there is nothing to register manually.
 
 ### Devices
 
-- **Device Name:** Main device representing your connected service/hardware
-  - Model information
-  - Software version
-  - Configuration URL (link to device web interface)
+- **One device per charge point**, named "Ladestation `<chargePointId>`" — manufacturer, model,
+  and firmware version come from the `BootNotification`.
+- **One sub-device per connector** (`via_device` pointing at the charge point), named
+  "Ladepunkt `<connectorId>`". `connectorId 0` (the charge point as a whole, per OCPP 1.6) never
+  gets its own device or entities.
 
-### Entities
-
-The following entities are automatically created:
+### Entities (per connector)
 
 #### Sensors
 
-- `sensor.<device_name>_<sensor_name>` - Descriptive sensor measurements
-- More sensors as applicable to your setup
-
-#### Binary Sensors
-
-- `binary_sensor.<device_name>_<sensor_name>` - On/off status indicators
+- **Charge Point State** — five-value connector state (`not_connected`/`ready`/`charging`/
+  `unavailable`/`error`), with the raw OCPP status and error code as attributes
+- **Current Power** — the connector's current charging power in watts
+- **Effective Power Limit** — the power limit currently in effect, read back from the charge point
+- **Measurand sensors** — one dynamic sensor per measurand the charge point actually reports
+  (energy, voltage, current, temperature, state of charge, ...)
 
 #### Switches
 
-- `switch.<device_name>_<switch_name>` - Controllable on/off switches
+- **Start/Stop** — remote-starts or stops a transaction
+- **Availability** — takes the connector operative or inoperative
 
-#### Other Platforms
-
-Additional entities may be created depending on your device capabilities.
+See the [README](../../README.md#available-entities) for full details, and
+[INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) if you're building another integration
+against these entities and services.
 
 ## First Steps
 
@@ -105,64 +128,62 @@ Example entities card:
 
 ```yaml
 type: entities
-title: OCCP - OCPP 1.6 Central System
+title: Charge Point CP001
 entities:
-  - sensor.device_name_sensor
-  - binary_sensor.device_name_connectivity
-  - switch.device_name_switch
+  - sensor.ladepunkt_1
+  - sensor.ladepunkt_1_power
+  - switch.ladepunkt_1
+  - switch.ladepunkt_1_2
 ```
 
 ### Automations
 
-Use the integration in automations:
-
-**Example - Trigger on sensor change:**
+**Example — notify when charging starts:**
 
 ```yaml
 automation:
-  - alias: "React to sensor value"
+  - alias: "Notify when charging starts"
     trigger:
       - trigger: state
-        entity_id: sensor.device_name_sensor
+        entity_id: sensor.ladepunkt_1
+        to: "charging"
     action:
       - action: notify.notify
         data:
-          message: "Sensor changed to {{ trigger.to_state.state }}"
+          message: "Charging started on connector 1."
 ```
 
-**Example - Control switch based on time:**
+**Example — remote-start a transaction on a schedule:**
 
 ```yaml
 automation:
-  - alias: "Turn on in morning"
+  - alias: "Start charging at night"
     trigger:
       - trigger: time
-        at: "07:00:00"
+        at: "22:00:00"
     action:
       - action: switch.turn_on
         target:
-          entity_id: switch.device_name_switch
+          entity_id: switch.ladepunkt_1
 ```
+
+See [EXAMPLES.md](./EXAMPLES.md) for more, including the power-limiting services.
 
 ## Troubleshooting
 
-### Connection Failed
+### Charge point does not appear
 
-If setup fails with connection errors:
+1. Confirm the charge point's configured OCPP backend URL matches
+   `ws://<host>:<port>/<chargePointId>` and uses subprotocol `ocpp1.6`
+2. Check that nothing else on the network is already bound to the configured port
+3. Check the Home Assistant log for connection attempts and rejected connections
 
-1. Verify the host/IP address is correct and reachable
-2. Check that the API key/token is valid
-3. Ensure no firewall is blocking the connection
-4. Check Home Assistant logs for detailed error messages
+### Entities show "Unavailable"
 
-### Entities Not Updating
-
-If entities show "Unavailable" or don't update:
-
-1. Check that the device/service is online
-2. Verify API credentials haven't expired
-3. Review logs: **Settings** → **System** → **Logs**
-4. Try reloading the integration
+- **Current Power** is unavailable until the charge point has actually reported a matching
+  measurand — that is expected, not an error, if no transaction is running.
+- For anything else, check that the charge point's connection is still active
+  (**Settings** → **Devices & Services** → the charge-point device) and review the log.
 
 ### Debug Logging
 
@@ -179,7 +200,7 @@ Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs f
 
 ## Next Steps
 
-- See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options
+- See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options and the full service reference
 - See [EXAMPLES.md](./EXAMPLES.md) for more automation examples
 - Report issues at [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues)
 
