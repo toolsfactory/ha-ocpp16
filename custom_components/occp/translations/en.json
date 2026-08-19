@@ -39,6 +39,34 @@
       }
     }
   },
+  "entity": {
+    "sensor": {
+      "charge_point_state": {
+        "name": "State",
+        "state": {
+          "not_connected": "Not Connected",
+          "ready": "Ready",
+          "charging": "Charging",
+          "unavailable": "Unavailable",
+          "error": "Error"
+        }
+      },
+      "current_power_w": {
+        "name": "Current Power"
+      },
+      "effective_power_limit_w": {
+        "name": "Effective Power Limit"
+      }
+    },
+    "switch": {
+      "start_stop": {
+        "name": "Start/Stop"
+      },
+      "availability": {
+        "name": "Availability"
+      }
+    }
+  },
   "services": {
     "set_power_limit": {
       "name": "Leistungsgrenze setzen",
