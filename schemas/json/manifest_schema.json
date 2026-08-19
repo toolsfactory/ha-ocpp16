@@ -315,11 +315,11 @@
         "enum": ["bronze", "silver", "gold", "platinum", "internal", "legacy"]
       },
       "requirements": {
-        "description": "The PyPI package requirements for the integration. The package has to be pinned to a specific version.\nhttps://developers.home-assistant.io/docs/creating_integration_manifest/#requirements",
+        "description": "The PyPI package requirements for the integration. Each entry must constrain its version (exact pin or range).\nhttps://developers.home-assistant.io/docs/creating_integration_manifest/#requirements",
         "type": "array",
         "items": {
           "type": "string",
-          "pattern": ".+==.+"
+          "pattern": ".+(==|>=|<=|~=|!=|<|>).+"
         },
         "uniqueItems": true
       },
