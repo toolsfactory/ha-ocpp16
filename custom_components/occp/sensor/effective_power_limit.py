@@ -37,10 +37,16 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
     @callback
     def _handle_coordinator_update(self) -> None:
         event = self.coordinator.data
-        if event is not None and event.connector_id is not None and event.connector_id != self._connector_id:
-            # Kein charge-point-weites Ereignis und nicht für diesen Connector --
-            # ein GetCompositeSchedule-Aufruf hier wäre nur unnötiger Central-
-            # System-initiierter Traffic zum Charge Point.
+        if event is not None and (
+            event.charge_point_id != self._charge_point_id
+            or (event.connector_id is not None and event.connector_id != self._connector_id)
+        ):
+            # Weder für unseren Charge Point noch (falls Connector-spezifisch)
+            # für unseren Connector -- ein GetCompositeSchedule-Aufruf hier
+            # wäre nur unnötiger Central-System-initiierter Traffic. Ohne die
+            # charge_point_id-Prüfung würden mehrere Charge Points an einer
+            # Instanz mit identischer Connector-Nummerierung sich gegenseitig
+            # zu unnötigen Abfragen triggern.
             return
         if TYPE_CHECKING:
             assert self.coordinator.config_entry is not None

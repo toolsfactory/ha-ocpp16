@@ -1,6 +1,7 @@
 """Tests for `OccpEffectivePowerLimitSensor` (Fähigkeit 5, REQ-0035 AC4)."""
 
 from collections.abc import Callable
+from unittest.mock import AsyncMock
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -62,6 +63,31 @@ async def test_ignores_events_for_a_different_connector(
     entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_effective_power_limit_w")
     assert hass.states.get(entity_id).state == "unknown"
     mock_charge_point_connection.get_composite_schedule.assert_awaited_once_with(2, 3600)
+
+
+async def test_ignores_events_for_a_different_charge_point_with_the_same_connector_number(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """Two charge points on one instance, both with a connector 1, must not cross-trigger."""
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection, charge_point_id=CHARGE_POINT_ID)
+    other_connection = AsyncMock()
+    boot_charge_point(entry_data.app, other_connection, charge_point_id="CP999")
+    publish_state_change(entry_data.app, charge_point_id=CHARGE_POINT_ID, connector_id=None)
+    publish_state_change(entry_data.app, charge_point_id="CP999", connector_id=None)
+    await hass.async_block_till_done()
+    mock_charge_point_connection.get_composite_schedule.reset_mock()
+
+    # A charge-point-wide event (connector_id=None) for the OTHER charge point
+    # must not refresh CHARGE_POINT_ID's connector 1 sensor.
+    publish_state_change(entry_data.app, charge_point_id="CP999", connector_id=None)
+    await hass.async_block_till_done()
+
+    mock_charge_point_connection.get_composite_schedule.assert_not_awaited()
 
 
 async def test_stays_unknown_when_the_charge_point_ignores_the_requested_unit(
