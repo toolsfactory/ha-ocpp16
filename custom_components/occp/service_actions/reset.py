@@ -31,4 +31,6 @@ async def _handle_reset(hass: HomeAssistant, call: ServiceCall) -> ServiceRespon
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
         ) from err
+    if not result.accepted:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="reset_rejected")
     return {"accepted": result.accepted}

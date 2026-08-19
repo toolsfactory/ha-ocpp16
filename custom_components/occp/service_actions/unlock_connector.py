@@ -24,4 +24,10 @@ async def _handle_unlock_connector(hass: HomeAssistant, call: ServiceCall) -> Se
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
         ) from err
+    if result.status != "Unlocked":
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unlock_rejected",
+            translation_placeholders={"status": result.status},
+        )
     return {"status": result.status}

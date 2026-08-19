@@ -58,4 +58,10 @@ async def _handle_change_configuration(hass: HomeAssistant, call: ServiceCall) -
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
         ) from err
+    if result.status not in ("Accepted", "RebootRequired"):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="change_configuration_rejected",
+            translation_placeholders={"status": result.status},
+        )
     return {"status": result.status}

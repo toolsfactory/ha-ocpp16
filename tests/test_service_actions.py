@@ -132,6 +132,70 @@ async def test_get_and_change_configuration(
     assert response == {"status": "Accepted"}
 
 
+async def test_reset_rejected_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """A `reset` the charge point does not accept must fail the service call, not return `{"accepted": false}`."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.reset.return_value = "Rejected"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_RESET,
+            {"device_id": charge_point_device_id, "reset_type": "Soft"},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_unlock_connector_rejected_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """A connector the charge point fails to unlock must fail the service call."""
+    _, connector_device_id = booted_charge_point
+    mock_charge_point_connection.unlock_connector.return_value = "UnlockFailed"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_UNLOCK_CONNECTOR, {"device_id": connector_device_id}, blocking=True, return_response=True
+        )
+
+
+async def test_change_configuration_rejected_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """A configuration change the charge point rejects must fail the service call."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.change_configuration.return_value = "Rejected"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_CHANGE_CONFIGURATION,
+            {"device_id": charge_point_device_id, "key": "HeartbeatInterval", "value": "250"},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_change_configuration_reboot_required_is_not_rejected(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """ "RebootRequired" is still success -- the change was applied, just pending a reboot."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.change_configuration.return_value = "RebootRequired"
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_CHANGE_CONFIGURATION,
+        {"device_id": charge_point_device_id, "key": "HeartbeatInterval", "value": "250"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"status": "RebootRequired"}
+
+
 async def test_unknown_device_raises_service_validation_error(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:
