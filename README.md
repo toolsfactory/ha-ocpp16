@@ -176,6 +176,11 @@ data:
   id_token: TAG001
 ```
 
+`charge_point_id` alone is ambiguous if two loaded instances happen to see the same OCPP
+`chargePointId`. Add an optional `device_id` (the charge point's or a connector's device) to
+resolve it unambiguously — see [`CONFIGURATION.md`](docs/user/CONFIGURATION.md#occpauthorize_id_token)
+for details.
+
 ### `occp.reset`
 
 Soft- or hard-reset the charge point (targets the charge-point device itself, not a connector).

@@ -40,7 +40,7 @@ With no file configured, OCCP's authorization provider has an empty allow-list, 
 file listing at least the `Default idTag` if you want the `start_stop` switch or
 `occp.authorize_id_token` to work at all.
 
-### Options Flow (Reconfiguration)
+### Options Flow
 
 The **Authorization File** and **Default idTag** can be changed after setup, without recreating
 the integration — the entry reloads automatically to apply the change:
@@ -51,9 +51,22 @@ the integration — the entry reloads automatically to apply the change:
 4. Modify the authorization file path or default idTag
 5. Click **Submit**
 
-**Host and port cannot be changed this way** — they are fixed once the entry is created. To listen
-on a different address/port, add a new config entry (see "Multiple Instances" below) and remove
-the old one.
+Setting a **Default idTag** requires an authorization file that actually accepts it — an unknown,
+blocked, or expired idTag is rejected at this step rather than saved and failing later.
+
+### Reconfigure Flow (Host/Port)
+
+The **Host** and **Port** can also be changed after setup, without deleting and re-adding the
+entry (and losing its devices/entities/history):
+
+1. Go to **Settings** → **Devices & Services**
+2. Find the specific "OCCP (host:port)" entry you want to change
+3. Open its menu (⋮) and select **Reconfigure**
+4. Enter the new host/port — the same port-in-use check from initial setup applies
+5. Click **Submit** — the entry reloads on the new address automatically
+
+The Authorization File and Default idTag are not part of this flow — change those via **Configure**
+(the options flow above) instead.
 
 ## Entity Configuration
 
@@ -138,6 +151,22 @@ data:
   charge_point_id: CP001
   id_token: TAG001
 ```
+
+`charge_point_id` alone is ambiguous the moment two loaded OCCP instances happen to see the same
+OCPP `chargePointId` — the call is answered by whichever instance's registry is scanned first,
+which is not guaranteed to be the one you meant. Add `device_id` (the charge point's or a
+connector's device) to resolve it unambiguously instead:
+
+```yaml
+action: occp.authorize_id_token
+data:
+  charge_point_id: CP001
+  id_token: TAG001
+  device_id: <charge point or connector device id>
+```
+
+If you only ever run a single OCCP instance, or are certain no two instances share a
+`chargePointId`, omitting `device_id` is fine — it exists specifically for the multi-instance case.
 
 ### `occp.reset`
 
