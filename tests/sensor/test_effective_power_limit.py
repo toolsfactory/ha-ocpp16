@@ -4,15 +4,23 @@ import asyncio
 from collections.abc import Callable
 from unittest.mock import AsyncMock
 
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN
-from custom_components.occp.core.domain.commands import CompositeScheduleResult
+from custom_components.occp.core.domain.commands import ChargePointNotConnectedError, CompositeScheduleResult
 from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_platform, entity_registry as er
 
 CHARGE_POINT_ID = "CP001"
+
+
+def _get_entity(hass: HomeAssistant, entity_id: str):
+    for platform in entity_platform.async_get_platforms(hass, DOMAIN):
+        if entity_id in platform.entities:
+            return platform.entities[entity_id]
+    raise AssertionError(f"entity {entity_id} not found on any occp platform")
 
 
 async def test_refreshes_via_get_composite_schedule_on_a_connector_scoped_event(
@@ -45,6 +53,61 @@ async def test_refreshes_via_get_composite_schedule_on_a_connector_scoped_event(
 
     assert hass.states.get(entity_id).state == "5000.0"
     mock_charge_point_connection.get_composite_schedule.assert_awaited_with(1, 3600)
+
+
+async def test_expected_connection_error_does_not_crash_the_listener(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """A CommandError from a disconnected charge point stays caught -- the listener keeps working."""
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
+    entity = _get_entity(hass, entity_id)
+
+    mock_charge_point_connection.get_composite_schedule.side_effect = ChargePointNotConnectedError("gone")
+    await entity._async_refresh_power_limit()  # noqa: SLF001
+    assert hass.states.get(entity_id).state == "unknown"
+
+    # The listener itself is still usable afterwards -- a later successful call still works.
+    mock_charge_point_connection.get_composite_schedule.side_effect = None
+    await entity._async_refresh_power_limit()  # noqa: SLF001
+    assert hass.states.get(entity_id).state == "5000.0"
+
+
+async def test_unexpected_error_is_not_swallowed(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """A genuine programming error must propagate, not disappear behind a blanket `except Exception`."""
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
+    entity = _get_entity(hass, entity_id)
+
+    mock_charge_point_connection.get_composite_schedule.side_effect = ValueError("not a connection problem")
+    with pytest.raises(ValueError, match="not a connection problem"):
+        await entity._async_refresh_power_limit()  # noqa: SLF001
 
 
 async def test_coalesces_a_burst_of_events_into_at_most_one_follow_up_call(

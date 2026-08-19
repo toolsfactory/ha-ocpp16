@@ -5,6 +5,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from custom_components.occp.coordinator import OccpCoordinator
+from custom_components.occp.core.domain.commands import CommandError
 from custom_components.occp.runtime import OccpEntryData
 from custom_components.occp.utils import interop
 from homeassistant.components.sensor import SensorDeviceClass
@@ -14,6 +15,15 @@ from homeassistant.core import callback
 from ._base import _OccpConnectorSensorBase
 
 _LOGGER = logging.getLogger(__name__)
+
+# Central-System-initiierte Aufrufe können jederzeit an einem erwartbaren Geräte-/
+# Verbindungsproblem scheitern -- diese drei bleiben gefangen, alles andere (ein echter
+# Programmierfehler) propagiert sichtbar statt in einem pauschalen `except Exception` zu
+# verschwinden. `TimeoutError` ist seit Python 3.11 ein Alias für `asyncio.TimeoutError`.
+# Als benannte Konstante statt Inline-Tupel, weil `ruff format` 0.16.0 bei einem
+# dreielementigen Tupel-Literal direkt in einer `except`-Klausel dessen Klammern entfernt
+# (gültige, aber unkonventionelle Python-3-Syntax) -- reproduzierbar isoliert nachvollzogen.
+_EXPECTED_REFRESH_ERRORS = (CommandError, TimeoutError, ConnectionError)
 
 
 class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
@@ -76,12 +86,7 @@ class OccpEffectivePowerLimitSensor(_OccpConnectorSensorBase):
                         self._charge_point_id,
                         self._connector_id,
                     )
-                except Exception:
-                    # Central-System-initiierter Aufruf kann jederzeit fehlschlagen
-                    # (z. B. Charge Point trennt gerade die Verbindung) -- ein
-                    # einzelner fehlgeschlagener GetCompositeSchedule-Versuch darf
-                    # nicht den gesamten Coordinator-Listener (und damit andere
-                    # Entities desselben Updates) zum Absturz bringen.
+                except _EXPECTED_REFRESH_ERRORS:
                     _LOGGER.debug(
                         "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert.",
                         self._charge_point_id,
