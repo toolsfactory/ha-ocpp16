@@ -7,7 +7,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.occp.entity_utils.device import connector_identifier
+from custom_components.occp.entity_utils.device import charge_point_identifier, connector_identifier
 from custom_components.occp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
 from custom_components.occp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
 from custom_components.occp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
@@ -35,9 +35,11 @@ async def booted_charge_point(
     await hass.async_block_till_done()
 
     registry = dr.async_get(hass)
-    charge_point_device = registry.async_get_device_by_identifier((DOMAIN, CHARGE_POINT_ID), init_integration.entry_id)
+    charge_point_device = registry.async_get_device_by_identifier(
+        (DOMAIN, charge_point_identifier(init_integration.entry_id, CHARGE_POINT_ID)), init_integration.entry_id
+    )
     connector_device = registry.async_get_device_by_identifier(
-        (DOMAIN, connector_identifier(CHARGE_POINT_ID, 1)), init_integration.entry_id
+        (DOMAIN, connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)), init_integration.entry_id
     )
     assert charge_point_device is not None
     assert connector_device is not None
@@ -206,7 +208,7 @@ async def test_service_call_reaches_the_device_s_own_entry_not_the_first_loaded_
     await hass.async_block_till_done()
 
     second_charge_point_device = dr.async_get(hass).async_get_device_by_identifier(
-        (DOMAIN, CHARGE_POINT_ID), second_entry.entry_id
+        (DOMAIN, charge_point_identifier(second_entry.entry_id, CHARGE_POINT_ID)), second_entry.entry_id
     )
     assert second_charge_point_device is not None
     assert second_charge_point_device.id != charge_point_device_id

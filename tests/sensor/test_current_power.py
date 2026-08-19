@@ -5,13 +5,14 @@ from collections.abc import Callable
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN, MEASURAND_POWER_ACTIVE_IMPORT
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 CHARGE_POINT_ID = "CP001"
 
 
-async def test_unavailable_until_a_power_sample_is_reported(
+async def test_unknown_until_a_power_sample_is_reported(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     mock_charge_point_connection,
@@ -19,15 +20,17 @@ async def test_unavailable_until_a_power_sample_is_reported(
     publish_state_change: Callable[..., None],
     record_meter_sample: Callable[..., None],
 ) -> None:
-    """REQ-0035 AC1: unavailable until a matching measurand has been reported, not `0`."""
+    """`unknown` (not `0`, and not `unavailable` -- the charge point is online) until a sample arrives."""
     entry_data = init_integration.runtime_data
     boot_charge_point(entry_data.app, mock_charge_point_connection)
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
     assert entity_id is not None
-    assert hass.states.get(entity_id).state == "unavailable"
+    assert hass.states.get(entity_id).state == "unknown"
 
     record_meter_sample(entry_data.app, measurand=MEASURAND_POWER_ACTIVE_IMPORT, value="1500", unit="W", connector_id=1)
     publish_state_change(entry_data.app, connector_id=1)
@@ -53,7 +56,9 @@ async def test_kw_value_is_converted_to_watts(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
     assert hass.states.get(entity_id).state == "7400.0"
 
 
@@ -72,7 +77,9 @@ async def test_missing_unit_is_treated_as_watts(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
     assert hass.states.get(entity_id).state == "500.0"
 
 
@@ -91,8 +98,10 @@ async def test_non_numeric_value_does_not_crash(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
-    assert hass.states.get(entity_id).state == "unavailable"
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
+    assert hass.states.get(entity_id).state == "unknown"
 
 
 async def test_per_phase_samples_are_summed_when_no_total_is_reported(
@@ -118,7 +127,9 @@ async def test_per_phase_samples_are_summed_when_no_total_is_reported(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
     assert hass.states.get(entity_id).state == "3300.0"
 
 
@@ -140,5 +151,7 @@ async def test_total_sample_is_preferred_over_per_phase_samples(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_current_power_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_current_power_w"
+    )
     assert hass.states.get(entity_id).state == "2500.0"

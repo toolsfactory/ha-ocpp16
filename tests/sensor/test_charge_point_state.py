@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -24,7 +25,8 @@ async def test_status_maps_to_five_value_state_model(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_charge_point_state")
+    unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_charge_point_state"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
 
     state = hass.states.get(entity_id)
@@ -54,7 +56,8 @@ async def test_faulted_status_maps_to_error(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_charge_point_state")
+    unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_charge_point_state"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     state = hass.states.get(entity_id)
     assert state.state == "error"
     assert state.attributes["error_code"] == "GroundFailure"

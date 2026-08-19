@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -32,9 +33,10 @@ async def test_new_measurand_creates_a_sensor_with_mapped_unit_and_device_class(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id(
-        "sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_measurand_energy_active_import_register"
+    unique_id = (
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_measurand_energy_active_import_register"
     )
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
 
     state = hass.states.get(entity_id)
@@ -62,10 +64,9 @@ async def test_multi_phase_samples_of_the_same_measurand_do_not_overwrite_each_o
     await hass.async_block_till_done()
 
     registry = er.async_get(hass)
+    connector_id = connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)
     for phase, expected_value in (("l1", "6"), ("l2", "7"), ("l3", "8")):
-        entity_id = registry.async_get_entity_id(
-            "sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_measurand_current_import_{phase}"
-        )
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{connector_id}_measurand_current_import_{phase}")
         assert entity_id is not None, f"no entity for phase {phase}"
         assert hass.states.get(entity_id).state == expected_value
 
@@ -85,7 +86,8 @@ async def test_unmapped_measurand_still_gets_a_sensor(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_measurand_rpm")
+    unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_measurand_rpm"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
 
     state = hass.states.get(entity_id)

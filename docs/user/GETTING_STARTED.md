@@ -181,12 +181,13 @@ See [EXAMPLES.md](./EXAMPLES.md) for more, including the power-limiting services
 2. Check that nothing else on the network is already bound to the configured port
 3. Check the Home Assistant log for connection attempts and rejected connections
 
-### Entities show "Unavailable"
+### Entities show "Unknown" or "Unavailable"
 
-- **Current Power** is unavailable until the charge point has actually reported a matching
-  measurand — that is expected, not an error, if no transaction is running.
-- For anything else, check that the charge point's connection is still active
-  (**Settings** → **Devices & Services** → the charge-point device) and review the log.
+- **Current Power** and **Effective Power Limit** show `unknown` until the charge point has
+  actually reported a matching value — that is expected, not an error, if no transaction is
+  running yet.
+- `unavailable` means the charge point itself isn't connected. Check that its connection is still
+  active (**Settings** → **Devices & Services** → the charge-point device) and review the log.
 
 ### Debug Logging
 

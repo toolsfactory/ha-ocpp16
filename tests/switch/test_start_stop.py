@@ -7,6 +7,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -26,8 +27,9 @@ def mock_config_entry() -> MockConfigEntry:
     )
 
 
-def _get_entity_id(hass: HomeAssistant) -> str:
-    entity_id = er.async_get(hass).async_get_entity_id("switch", DOMAIN, f"{CHARGE_POINT_ID}_1_start_stop")
+def _get_entity_id(hass: HomeAssistant, entry_id: str) -> str:
+    unique_id = f"{connector_identifier(entry_id, CHARGE_POINT_ID, 1)}_start_stop"
+    entity_id = er.async_get(hass).async_get_entity_id("switch", DOMAIN, unique_id)
     assert entity_id is not None
     return entity_id
 
@@ -44,7 +46,7 @@ async def test_turn_on_starts_a_transaction(
     boot_charge_point(entry_data.app, mock_charge_point_connection)
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
-    entity_id = _get_entity_id(hass)
+    entity_id = _get_entity_id(hass, init_integration.entry_id)
     assert hass.states.get(entity_id).state == "off"
 
     await hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)
@@ -73,7 +75,7 @@ async def test_turn_on_without_default_id_tag_raises(
     boot_charge_point(entry_data.app, mock_charge_point_connection)
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
-    entity_id = _get_entity_id(hass)
+    entity_id = _get_entity_id(hass, entry.entry_id)
 
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call("switch", "turn_on", {"entity_id": entity_id}, blocking=True)
@@ -91,7 +93,7 @@ async def test_turn_on_rejected_by_charge_point_raises(
     boot_charge_point(entry_data.app, mock_charge_point_connection)
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
-    entity_id = _get_entity_id(hass)
+    entity_id = _get_entity_id(hass, init_integration.entry_id)
 
     mock_charge_point_connection.remote_start_transaction.return_value = "Rejected"
     with pytest.raises(HomeAssistantError):
@@ -118,7 +120,7 @@ async def test_turn_off_stops_the_active_transaction(
     )
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
-    entity_id = _get_entity_id(hass)
+    entity_id = _get_entity_id(hass, init_integration.entry_id)
     assert hass.states.get(entity_id).state == "on"
 
     await hass.services.async_call("switch", "turn_off", {"entity_id": entity_id}, blocking=True)

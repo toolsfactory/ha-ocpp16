@@ -13,7 +13,7 @@ bleibt.
 
 from custom_components.occp.coordinator import OccpCoordinator
 from custom_components.occp.core.domain.models import ConnectionStatus
-from custom_components.occp.entity_utils.device import connector_device_info
+from custom_components.occp.entity_utils.device import connector_device_info, connector_identifier
 from custom_components.occp.runtime import OccpEntryData
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -36,8 +36,10 @@ class OccpConnectorEntity(CoordinatorEntity[OccpCoordinator]):
         self._entry_data = entry_data
         self._charge_point_id = charge_point_id
         self._connector_id = connector_id
-        self._attr_unique_id = f"{charge_point_id}_{connector_id}_{entity_key}"
-        self._attr_device_info = connector_device_info(charge_point_id, connector_id)
+        self._attr_unique_id = (
+            f"{connector_identifier(entry_data.entry_id, charge_point_id, connector_id)}_{entity_key}"
+        )
+        self._attr_device_info = connector_device_info(entry_data.entry_id, charge_point_id, connector_id)
 
     @property
     def available(self) -> bool:

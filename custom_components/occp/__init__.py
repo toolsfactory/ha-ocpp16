@@ -72,7 +72,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
         # vendor/model werden erst mit deren mark_boot()-Aufruf bekannt.
         device_registry.async_get_or_create(
             config_entry_id=entry.entry_id,
-            **charge_point_device_info(event.charge_point_id, app.registry.get(event.charge_point_id)),
+            **charge_point_device_info(entry.entry_id, event.charge_point_id, app.registry.get(event.charge_point_id)),
         )
 
     # Muss VOR dem Coordinator abonnieren: der EventBus ruft Listener in
@@ -87,7 +87,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
     coordinator = OccpCoordinator(hass, entry, app)
     entry.async_on_unload(coordinator.async_unsubscribe)
 
-    entry_data = OccpEntryData(app=app, coordinator=coordinator, default_id_tag=entry.options.get(CONF_DEFAULT_ID_TAG))
+    entry_data = OccpEntryData(
+        app=app,
+        coordinator=coordinator,
+        default_id_tag=entry.options.get(CONF_DEFAULT_ID_TAG),
+        entry_id=entry.entry_id,
+    )
     entry.runtime_data = entry_data
 
     # authorization_file/default_id_tag sind einmalig in CentralSystemApp/entry_data

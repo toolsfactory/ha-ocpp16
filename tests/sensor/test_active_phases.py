@@ -5,14 +5,16 @@ from collections.abc import Callable
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 CHARGE_POINT_ID = "CP001"
 
 
-def _get_entity_id(hass: HomeAssistant) -> str:
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_active_phases")
+def _get_entity_id(hass: HomeAssistant, entry_id: str) -> str:
+    unique_id = f"{connector_identifier(entry_id, CHARGE_POINT_ID, 1)}_active_phases"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
     return entity_id
 
@@ -30,7 +32,7 @@ async def test_no_current_reported_yet(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    state = hass.states.get(_get_entity_id(hass))
+    state = hass.states.get(_get_entity_id(hass, init_integration.entry_id))
     assert state.state == "0"
     assert state.attributes["phase_l1_a"] is None
     assert state.attributes["phase_l2_a"] is None
@@ -54,7 +56,7 @@ async def test_three_active_phases(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    state = hass.states.get(_get_entity_id(hass))
+    state = hass.states.get(_get_entity_id(hass, init_integration.entry_id))
     assert state.state == "3"
     assert state.attributes["phase_l1_a"] == 6.1
     assert state.attributes["phase_l2_a"] == 6.2
@@ -77,7 +79,7 @@ async def test_zero_current_phase_does_not_count_as_active(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    state = hass.states.get(_get_entity_id(hass))
+    state = hass.states.get(_get_entity_id(hass, init_integration.entry_id))
     assert state.state == "1"
     assert state.attributes["phase_l1_a"] == 6.0
     assert state.attributes["phase_l2_a"] == 0.0

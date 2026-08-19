@@ -14,6 +14,12 @@ class OccpCurrentPowerSensor(_OccpConnectorSensorBase):
 
     Fähigkeit 1 des Interop-Vertrags (REQ-0035 AC1), unabhängig von den
     dynamischen Measurand-Sensoren aus REQ-0018.
+
+    ``available`` folgt der Basisklasse (nur Online-Status) statt eigens zu
+    ``unavailable`` zu werden, solange kein passender Messwert gemeldet
+    wurde -- ``unavailable`` bedeutet nach HA-Konvention "nicht erreichbar",
+    nicht "Einzelwert fehlt noch". Ein fehlender Wert liefert stattdessen
+    ``unknown`` über ``native_value -> None``.
     """
 
     _attr_translation_key = "current_power_w"
@@ -29,14 +35,7 @@ class OccpCurrentPowerSensor(_OccpConnectorSensorBase):
 
     @property
     def native_value(self) -> float | None:
-        """Return the connector's current charging power in watts."""
+        """Return the connector's current charging power in watts, or `None` if none has been reported yet."""
         return interop.get_current_power_w(
             self._entry_data.app.query_service, self._charge_point_id, self._connector_id
         )
-
-    @property
-    def available(self) -> bool:
-        """Return whether the connection is online and a power value was reported."""
-        # REQ-0035 AC1: unavailable, sofern kein passender Messwert gemeldet
-        # wurde -- zusätzlich zur allgemeinen Online-Prüfung der Basisklasse.
-        return super().available and self.native_value is not None

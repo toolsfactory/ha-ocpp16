@@ -6,7 +6,7 @@ Gegenrichtung würde einen Zirkelimport erzeugen.
 """
 
 from custom_components.occp.const import DOMAIN
-from custom_components.occp.entity_utils.device import parse_connector_identifier
+from custom_components.occp.entity_utils.device import parse_charge_point_identifier, parse_connector_identifier
 from custom_components.occp.runtime import OccpEntryData
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -67,7 +67,10 @@ def _resolve_charge_point_device(hass: HomeAssistant, call: ServiceCall) -> tupl
             raise ServiceValidationError(
                 f"Gerät '{device_entry.id}' ist ein Connector -- dieser Service benötigt das Charge-Point-Gerät selbst."
             )
-        return _entry_data_for_device(hass, device_entry), identifier
+        charge_point_id = parse_charge_point_identifier(identifier)
+        if charge_point_id is None:
+            continue
+        return _entry_data_for_device(hass, device_entry), charge_point_id
 
     raise ServiceValidationError(f"Gerät '{device_entry.id}' gehört nicht zu OCCP.")
 

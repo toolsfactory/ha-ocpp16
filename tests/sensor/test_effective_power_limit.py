@@ -7,6 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import DOMAIN
 from custom_components.occp.core.domain.commands import CompositeScheduleResult
+from custom_components.occp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -26,7 +27,11 @@ async def test_refreshes_via_get_composite_schedule_on_a_connector_scoped_event(
     publish_state_change(entry_data.app, connector_id=None)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_effective_power_limit_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
     assert entity_id is not None
     assert hass.states.get(entity_id).state == "unknown"
 
@@ -60,7 +65,11 @@ async def test_ignores_events_for_a_different_connector(
     publish_state_change(entry_data.app, connector_id=2)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_effective_power_limit_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
     assert hass.states.get(entity_id).state == "unknown"
     mock_charge_point_connection.get_composite_schedule.assert_awaited_once_with(2, 3600)
 
@@ -115,5 +124,9 @@ async def test_stays_unknown_when_the_charge_point_ignores_the_requested_unit(
     publish_state_change(entry_data.app, connector_id=1)
     await hass.async_block_till_done()
 
-    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{CHARGE_POINT_ID}_1_effective_power_limit_w")
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_effective_power_limit_w",
+    )
     assert hass.states.get(entity_id).state == "unknown"

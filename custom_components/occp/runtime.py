@@ -26,6 +26,7 @@ class OccpEntryData:
     app: CentralSystemApp
     coordinator: OccpCoordinator
     default_id_tag: str | None
+    entry_id: str
 
 
 type OccpConfigEntry = ConfigEntry[OccpEntryData]
