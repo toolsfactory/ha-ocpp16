@@ -1,5 +1,6 @@
 """Dynamischer Sensor je tatsächlich gemeldetem Measurand (REQ-0018)."""
 
+import logging
 from typing import Any
 
 from custom_components.occp.coordinator import OccpCoordinator
@@ -14,8 +15,11 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
+from homeassistant.helpers.typing import StateType
 
 from ._base import _OccpConnectorSensorBase
+
+_LOGGER = logging.getLogger(__name__)
 
 # REQ-0018 AC3: Gesamtenergiezähler muss mit passender device_class/
 # state_class fürs Energie-Dashboard erkennbar sein. Weitere gängige OCPP-1.6-
@@ -89,10 +93,31 @@ class OccpMeasurandSensor(_OccpConnectorSensorBase):
         return max(matching, key=lambda s: s.recorded_at)
 
     @property
-    def native_value(self) -> str | None:
-        """Return the most recently reported sample value."""
+    def native_value(self) -> StateType:
+        """Return the most recently reported sample value.
+
+        Parsed to ``float`` whenever a ``state_class`` is set -- Home
+        Assistant's recorder requires a numeric value for statistics, and
+        every measurand in ``_MEASURAND_META`` (the only ones that get a
+        ``state_class``) is numeric per OCPP 1.6. Unmapped measurands have no
+        ``state_class`` and keep the raw string.
+        """
         sample = self._sample
-        return sample.value if sample else None
+        if sample is None:
+            return None
+        if self._attr_state_class is None:
+            return sample.value
+        try:
+            return float(sample.value)
+        except ValueError:
+            _LOGGER.debug(
+                "Nicht-numerischer Wert %r für Measurand %s (Connector %s/%s), wird ignoriert.",
+                sample.value,
+                self._measurand,
+                self._charge_point_id,
+                self._connector_id,
+            )
+            return None
 
     @property
     def native_unit_of_measurement(self) -> str | None:

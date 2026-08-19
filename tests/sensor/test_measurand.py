@@ -40,7 +40,7 @@ async def test_new_measurand_creates_a_sensor_with_mapped_unit_and_device_class(
     assert entity_id is not None
 
     state = hass.states.get(entity_id)
-    assert state.state == "12345"
+    assert state.state == "12345.0"
     assert state.attributes["unit_of_measurement"] == "Wh"
     assert state.attributes["device_class"] == "energy"
     assert state.attributes["state_class"] == "total_increasing"
@@ -65,7 +65,7 @@ async def test_multi_phase_samples_of_the_same_measurand_do_not_overwrite_each_o
 
     registry = er.async_get(hass)
     connector_id = connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)
-    for phase, expected_value in (("l1", "6"), ("l2", "7"), ("l3", "8")):
+    for phase, expected_value in (("l1", "6.0"), ("l2", "7.0"), ("l3", "8.0")):
         entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{connector_id}_measurand_current_import_{phase}")
         assert entity_id is not None, f"no entity for phase {phase}"
         assert hass.states.get(entity_id).state == expected_value
@@ -93,3 +93,24 @@ async def test_unmapped_measurand_still_gets_a_sensor(
     state = hass.states.get(entity_id)
     assert state.state == "1500"
     assert "device_class" not in state.attributes
+
+
+async def test_invalid_numeric_value_does_not_crash(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+    record_meter_sample: Callable[..., None],
+) -> None:
+    """A non-numeric value for a mapped (state_class-carrying) measurand yields `unknown`, not a crash."""
+    entry_data = init_integration.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    record_meter_sample(entry_data.app, connector_id=1, measurand="Voltage", value="N/A", unit="V")
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_measurand_voltage"
+    entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
+    assert entity_id is not None
+    assert hass.states.get(entity_id).state == "unknown"
