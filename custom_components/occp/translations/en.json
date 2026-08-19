@@ -56,6 +56,9 @@
       },
       "effective_power_limit_w": {
         "name": "Effective Power Limit"
+      },
+      "active_phases": {
+        "name": "Active Phases"
       }
     },
     "switch": {

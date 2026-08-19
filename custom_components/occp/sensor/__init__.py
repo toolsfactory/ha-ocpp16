@@ -12,6 +12,7 @@ from custom_components.occp.runtime import OccpConfigEntry, OccpEntryData
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .active_phases import OccpActivePhasesSensor
 from .charge_point_state import OccpChargePointStateSensor
 from .current_power import OccpCurrentPowerSensor
 from .effective_power_limit import OccpEffectivePowerLimitSensor
@@ -22,6 +23,7 @@ from .measurand import OccpMeasurandSensor
 PARALLEL_UPDATES = 0
 
 __all__ = [
+    "OccpActivePhasesSensor",
     "OccpChargePointStateSensor",
     "OccpCurrentPowerSensor",
     "OccpEffectivePowerLimitSensor",
@@ -79,7 +81,11 @@ class _SensorManager:
             connector_ids = [c.connector_id for c in query_service.get_connectors(charge_point_id)]
 
         new_entities: list[
-            OccpChargePointStateSensor | OccpCurrentPowerSensor | OccpEffectivePowerLimitSensor | OccpMeasurandSensor
+            OccpActivePhasesSensor
+            | OccpChargePointStateSensor
+            | OccpCurrentPowerSensor
+            | OccpEffectivePowerLimitSensor
+            | OccpMeasurandSensor
         ] = []
         for connector_id in connector_ids:
             if connector_id < 1:
@@ -92,6 +98,7 @@ class _SensorManager:
                         OccpChargePointStateSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                         OccpCurrentPowerSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                         OccpEffectivePowerLimitSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OccpActivePhasesSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                     ]
                 )
             new_entities.extend(self._new_measurand_sensors(charge_point_id, connector_id))

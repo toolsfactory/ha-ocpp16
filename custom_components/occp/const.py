@@ -69,3 +69,6 @@ RAW_STATUS_TO_STATE: dict[str, str] = {
 
 # -- Fähigkeit 1/5-Measurand (ADR-0010) --------------------------------------
 MEASURAND_POWER_ACTIVE_IMPORT = "Power.Active.Import"
+
+# -- Active-Phases-Sensor (kein Interop-Vertrag-Bestandteil) ----------------
+MEASURAND_CURRENT_IMPORT = "Current.Import"
