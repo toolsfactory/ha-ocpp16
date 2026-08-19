@@ -92,7 +92,11 @@
       "description": "Queries OCCP's authorization source for an idToken (interop contract capability 8).",
       "fields": {
         "charge_point_id": { "name": "Charge point ID", "description": "Identity of the charge point." },
-        "id_token": { "name": "idToken", "description": "idToken to check." }
+        "id_token": { "name": "idToken", "description": "idToken to check." },
+        "device_id": {
+          "name": "Device",
+          "description": "Optional. Disambiguates which OCCP instance to query when more than one instance happens to know the same charge point ID."
+        }
       }
     },
     "reset": {

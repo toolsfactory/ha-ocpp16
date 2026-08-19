@@ -7,6 +7,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.occp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
 from custom_components.occp.entity_utils.device import charge_point_identifier, connector_identifier
 from custom_components.occp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
 from custom_components.occp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
@@ -223,3 +224,79 @@ async def test_service_call_reaches_the_device_s_own_entry_not_the_first_loaded_
     assert response == {"accepted": True}
     second_connection.reset.assert_awaited_with("Soft")
     mock_charge_point_connection.reset.assert_not_awaited()
+
+
+async def test_authorize_id_token_with_device_id_scopes_to_the_correct_entry(
+    hass: HomeAssistant,
+    mock_app_start_stop: None,
+    init_integration: MockConfigEntry,
+    booted_charge_point: tuple[str, str],
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """`device_id` disambiguates two entries that both know the same `charge_point_id`.
+
+    Regression test for the residual ambiguity `_find_entry_data()` still has when no
+    `device_id` is given: it returns whichever loaded entry it scans first. Passing
+    `device_id` must reach that device's own entry instead.
+    """
+    charge_point_device_id, _ = booted_charge_point
+    init_integration.runtime_data.app.authorization = StaticAuthorizationProvider(
+        [StaticIdTagEntry(id_tag="FIRST-ENTRY-TAG")]
+    )
+
+    second_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="second-entry-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+    )
+    second_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(second_entry.entry_id)
+    await hass.async_block_till_done()
+    second_entry.runtime_data.app.authorization = StaticAuthorizationProvider(
+        [StaticIdTagEntry(id_tag="SECOND-ENTRY-TAG")]
+    )
+
+    boot_charge_point(second_entry.runtime_data.app, AsyncMock(), charge_point_id=CHARGE_POINT_ID)
+    publish_state_change(second_entry.runtime_data.app, charge_point_id=CHARGE_POINT_ID, connector_id=None)
+    await hass.async_block_till_done()
+
+    second_charge_point_device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, charge_point_identifier(second_entry.entry_id, CHARGE_POINT_ID)), second_entry.entry_id
+    )
+    assert second_charge_point_device is not None
+
+    # Without device_id: the existing scan-and-take-first-match behavior (documented, not
+    # fixed here) reaches the first-loaded entry regardless of which idTag we ask about.
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_AUTHORIZE_ID_TOKEN,
+        {"charge_point_id": CHARGE_POINT_ID, "id_token": "SECOND-ENTRY-TAG"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"authorized": False, "status": "invalid"}
+
+    # With device_id: scoped to the exact entry that owns the device, regardless of scan order.
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_AUTHORIZE_ID_TOKEN,
+        {
+            "charge_point_id": CHARGE_POINT_ID,
+            "id_token": "SECOND-ENTRY-TAG",
+            "device_id": second_charge_point_device.id,
+        },
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"authorized": True, "status": "accepted"}
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_AUTHORIZE_ID_TOKEN,
+        {"charge_point_id": CHARGE_POINT_ID, "id_token": "FIRST-ENTRY-TAG", "device_id": charge_point_device_id},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"authorized": True, "status": "accepted"}

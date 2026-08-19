@@ -36,6 +36,11 @@ authorize_id_token:
       required: true
       selector:
         text:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: occp
 
 reset:
   fields:
