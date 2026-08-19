@@ -208,10 +208,12 @@ belongs to.
 
 **Consequences:** Breaking change, shipped without a migration (pre-1.0, per `AGENTS.md`'s own
 default) — existing devices/entities from before this change become orphaned and need manual
-removal after upgrading. `authorize_id_token` is the one service that still resolves by bare
-`charge_point_id` (it takes no device), so it retains the residual cross-instance ambiguity this
-decision otherwise closes — tracked, not fixed, since closing it needs a service-schema change
-(e.g. an optional `device_id` alternative) that is its own breaking-change decision.
+removal after upgrading. `authorize_id_token` initially remained the one service that still
+resolved by bare `charge_point_id` (it takes no device) and so retained the residual
+cross-instance ambiguity this decision otherwise closes. Resolved 2026-08-19: an optional
+`device_id` field was added to the service (additive, not a schema break) — when present it
+resolves the entry the same way every other service does; when absent, the original scan-based
+behavior is unchanged, so callers who need disambiguation now have a way to get it.
 
 ---
 
