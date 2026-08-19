@@ -11,25 +11,69 @@ hier, da sie durch eigene REQs abgedeckt sind (siehe ADR-0010 Non-Goals-
 Abgrenzung in REQ-0035).
 """
 
+import logging
+
 from custom_components.occp.const import MEASURAND_POWER_ACTIVE_IMPORT
 from custom_components.occp.core.domain.authorization import AuthorizationProvider, IdTagStatus
 from custom_components.occp.core.domain.commands import CommandService
-from custom_components.occp.core.domain.models import QueryService
+from custom_components.occp.core.domain.models import MeterSample, QueryService
+
+_LOGGER = logging.getLogger(__name__)
 
 # -- Fähigkeit 1 --------------------------------------------------------
+
+_POWER_UNIT_MULTIPLIERS: dict[str, float] = {
+    "W": 1.0,
+    "kW": 1000.0,
+}
+
+
+def _parse_power_w(sample: MeterSample) -> float | None:
+    """Parse one Power.Active.Import sample's raw value/unit into watts.
+
+    Ein fehlender oder unbekannter Einheitswert wird als 'W' behandelt --
+    OCPP 1.6 erlaubt für dieses Measurand implizit Watt, sofern nichts
+    anderes angegeben ist.
+    """
+    try:
+        value = float(sample.value)
+    except ValueError:
+        _LOGGER.debug("Nicht-numerischer Power.Active.Import-Wert %r, wird ignoriert.", sample.value)
+        return None
+    if sample.unit is not None and sample.unit not in _POWER_UNIT_MULTIPLIERS:
+        _LOGGER.debug("Unbekannte Einheit %r für Power.Active.Import, wird als W behandelt.", sample.unit)
+    multiplier = _POWER_UNIT_MULTIPLIERS.get(sample.unit or "W", 1.0)
+    return value * multiplier
 
 
 def get_current_power_w(query_service: QueryService, charge_point_id: str, connector_id: int) -> float | None:
     """Aktuelle Ladeleistung (ADR-0010, Fähigkeit 1).
 
-    ``None`` -> Entity ``unavailable`` (REQ-0035 AC1).
+    ``None`` -> kein (parsbarer) Messwert vorhanden. Bevorzugt einen
+    phasenlosen Gesamtwert; fehlt dieser, werden alle gemeldeten
+    Phasenwerte summiert -- OCPP 1.6 markiert einen Gesamtwert nicht
+    explizit, sondern durch das Fehlen von ``phase``.
     """
     samples = query_service.get_meter_samples(charge_point_id=charge_point_id, connector_id=connector_id)
     matching = [s for s in samples if s.measurand == MEASURAND_POWER_ACTIVE_IMPORT]
     if not matching:
         return None
-    latest = max(matching, key=lambda s: s.recorded_at)
-    return float(latest.value)
+
+    total_samples = [s for s in matching if s.phase is None]
+    if total_samples:
+        latest = max(total_samples, key=lambda s: s.recorded_at)
+        return _parse_power_w(latest)
+
+    phase_values = []
+    for sample in matching:
+        if sample.phase is None:
+            continue
+        value = _parse_power_w(sample)
+        if value is not None:
+            phase_values.append(value)
+    if not phase_values:
+        return None
+    return sum(phase_values)
 
 
 # -- Fähigkeit 3/4 --------------------------------------------------------

@@ -495,13 +495,24 @@ class ChargePointHandler(OcppChargePoint):
         charging_rate_unit = schedule.get("charging_rate_unit")
         if charging_rate_unit is not None and charging_rate_unit != ocpp_enums.ChargingRateUnitType.watts.value:
             # Der Charge Point ist laut Spezifikation nicht zwingend an die
-            # angefragte Einheit gebunden -- keine Ampere-Watt-Umrechnung
-            # (REQ-0023 Non-Goal), aber sichtbar machen (ADR-0006, analog zum
-            # Rundungs-Log aus ADR-0005).
+            # angefragte Einheit gebunden. Eine Ampere-Watt-Umrechnung
+            # bräuchte Spannung/Phasenzahl, die hier nicht zuverlässig
+            # vorliegen (REQ-0023 Non-Goal) -- statt die rohe Zahl fälschlich
+            # als Watt auszugeben, liefert dieser Aufruf periods=[] zurück,
+            # sodass der Aufrufer (ADR-0010, Fähigkeit 5) den Zustand als
+            # unbekannt statt als falschen Wert behandelt (ADR-0006, analog
+            # zum Rundungs-Log aus ADR-0005).
             self.cp_logger.warning(
                 "GetCompositeSchedule: Charge Point meldet chargingRateUnit=%s "
-                "statt der angefragten 'W', keine Umrechnung (ADR-0006)",
+                "statt der angefragten 'W', keine Umrechnung -- Periods verworfen (ADR-0006)",
                 charging_rate_unit,
+            )
+            return CompositeScheduleResult(
+                status=status,
+                connector_id=response.connector_id,
+                schedule_start=(_parse_timestamp(response.schedule_start) if response.schedule_start else None),
+                duration_seconds=schedule.get("duration"),
+                charging_rate_unit=charging_rate_unit,
             )
 
         periods = [
