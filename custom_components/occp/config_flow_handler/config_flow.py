@@ -101,18 +101,62 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
         ).extend(OPTIONS_SCHEMA.schema)
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
-    def _host_port_already_configured(self, host: str, port: int) -> bool:
+    def _host_port_already_configured(self, host: str, port: int, *, exclude_entry_id: str | None = None) -> bool:
         """Return whether another entry already binds the same host/port.
 
         Ersetzt den früheren ``_abort_if_unique_id_configured()``-Duplikatscheck,
         der auf Host:Port als ``unique_id`` beruhte -- seit ``unique_id`` eine
         zufällige UUID ist (Projektregel: nie Host/Port als unique_id), muss
-        das Duplikat explizit über die Entry-Daten geprüft werden.
+        das Duplikat explizit über die Entry-Daten geprüft werden. ``exclude_entry_id``
+        lässt beim Reconfigure-Flow den zu bearbeitenden Eintrag selbst zu -- sonst würde
+        ein unverändertes Speichern immer als Duplikat abgelehnt.
         """
         return any(
-            entry.data.get(CONF_HOST) == host and entry.data.get(CONF_PORT) == port
+            entry.entry_id != exclude_entry_id
+            and entry.data.get(CONF_HOST) == host
+            and entry.data.get(CONF_PORT) == port
             for entry in self._async_current_entries(include_ignore=False)
         )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Change an existing entry's host/port without deleting and re-adding it.
+
+        REQ-0005/REQ-0020-Optionen (Autorisierungsdatei, Default-idTag) bleiben bewusst
+        außen vor -- die ändert der bereits vorhandene Options-Flow. ``unique_id`` ist
+        eine zufällige UUID, unabhängig von Host/Port (Projektregel), daher keine
+        Versionierung/Migration nötig -- nur die Werte in ``entry.data`` ändern sich,
+        nicht deren Form.
+        """
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            host = user_input[CONF_HOST]
+            port = user_input[CONF_PORT]
+
+            if self._host_port_already_configured(host, port, exclude_entry_id=reconfigure_entry.entry_id):
+                return self.async_abort(reason="already_configured")
+
+            try:
+                await self.hass.async_add_executor_job(_try_bind_port, host, port)
+            except OSError:
+                errors["port"] = "port_in_use"
+
+            if not errors:
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry, data_updates={CONF_HOST: host, CONF_PORT: port}
+                )
+
+        schema = self.add_suggested_values_to_schema(
+            vol.Schema(
+                {
+                    vol.Required(CONF_HOST): str,
+                    vol.Required(CONF_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+                }
+            ),
+            user_input if user_input is not None else reconfigure_entry.data,
+        )
+        return self.async_show_form(step_id="reconfigure", data_schema=schema, errors=errors)
 
     @staticmethod
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:

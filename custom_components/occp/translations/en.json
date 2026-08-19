@@ -16,6 +16,18 @@
           "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
           "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure OCCP Central System",
+        "description": "Change the listen address and port for this OCCP instance. The authorization list and default idTag are changed via \"Configure\" instead.",
+        "data": {
+          "host": "Host / bind address",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
+          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points."
+        }
       }
     },
     "error": {

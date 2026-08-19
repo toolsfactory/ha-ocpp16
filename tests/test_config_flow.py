@@ -161,6 +161,110 @@ async def test_user_flow_duplicate_host_port_aborts(hass: HomeAssistant) -> None
     assert result["reason"] == "already_configured"
 
 
+async def test_reconfigure_flow_changes_host_and_port(hass: HomeAssistant, mock_app_start_stop: None) -> None:
+    """Reconfigure updates host/port in place, without touching unique_id or the entry's options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "0.0.0.0", CONF_PORT: 9600}
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data == {CONF_HOST: "0.0.0.0", CONF_PORT: 9600}
+    assert entry.unique_id == "existing-uuid"
+    assert entry.options == {CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""}
+
+
+async def test_reconfigure_flow_port_in_use_recovers(hass: HomeAssistant, mock_app_start_stop: None) -> None:
+    """A bind failure during reconfigure shows the form again with an error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(_BIND_PATH, side_effect=OSError):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "0.0.0.0", CONF_PORT: 9600}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"port": "port_in_use"}
+    assert entry.data == {CONF_HOST: "0.0.0.0", CONF_PORT: 9500}
+
+
+async def test_reconfigure_flow_duplicate_of_another_entry_aborts(
+    hass: HomeAssistant, mock_app_start_stop: None
+) -> None:
+    """Reconfiguring onto another loaded entry's host/port aborts instead of colliding."""
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9600)",
+        unique_id="other-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9600},
+    )
+    other.add_to_hass(hass)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: "0.0.0.0", CONF_PORT: 9600})
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_reconfigure_flow_unchanged_host_port_still_succeeds(
+    hass: HomeAssistant, mock_app_start_stop: None
+) -> None:
+    """Reconfiguring onto the entry's own current host/port must not be treated as a duplicate."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: "0.0.0.0", CONF_PORT: 9500}
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+
 async def test_options_flow_round_trip(hass: HomeAssistant, mock_app_start_stop: None, tmp_path) -> None:
     """The options step is pre-filled with the entry's current values and can be changed."""
     auth_file = tmp_path / "auth.json"
