@@ -317,6 +317,42 @@ connectors per charge point, not a large fleet.
 The standalone core's ~210 tests live in the separate OCCP source repository and are not reachable
 from this devcontainer. Tracked, not attempted.
 
+### Removing stale charge-point devices
+
+**Status:** Deferred — no business rule decided yet
+
+A charge point that connects once and then disappears permanently (replaced, decommissioned,
+reconfigured to talk to a different Central System) leaves its device and entities behind forever
+— nothing in `__init__.py` ever removes a device once `_register_device` has created it. Fixing
+this needs a decision only the developer can make first: what counts as "permanently gone" (manual
+removal only vs. an automatic time-based rule, and if automatic, after how long with no
+reconnect) — a decision explicitly deferred rather than guessed at during the 2026-08-19
+QUALITY_REVIEW.md pass. Until that's decided, a charge point that will never come back needs manual
+removal via the device page in **Settings** → **Devices & Services**.
+
+### CI does not gate on type-check or tests
+
+**Status:** Blocked — environment permission, not a project decision
+
+`.github/workflows/lint.yml` only runs `script/lint-check`; `script/type-check` and `script/test`
+are not required CI jobs, so a type or runtime regression can merge despite green CI. Both the
+2026-08-18 and 2026-08-19 QUALITY_REVIEW.md passes flagged this, and both times the fix was
+identical and ready to apply — two new jobs mirroring the existing `ruff` job's
+checkout/Python/uv/cache setup, running `script/type-check` and `script/test` in place of
+`script/lint-check` — but the acting agent's permission settings deny writes to
+`.github/workflows/` in this environment. The developer needs to either apply this change directly
+or grant that access.
+
+### Brand assets
+
+**Status:** Deferred — outside this project's authority to do autonomously
+
+No local brand assets exist, and the Quality Scale `brands` rule requires submitting icon/logo
+assets to the external `home-assistant/brands` repository — a PR against an Open Home Foundation
+repo, which this project's own AI policy (`AGENTS.md`) forbids an agent from opening. Needs real
+artwork and a manually submitted PR from the developer; `docs-removal-instructions` (the other half
+of the same QUALITY_REVIEW.md finding) was addressed separately in `GETTING_STARTED.md`.
+
 ---
 
 ## Decision Review
