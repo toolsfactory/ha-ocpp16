@@ -121,10 +121,19 @@ resolve_venv_path() {
 }
 
 # Activate the Home Assistant virtual environment if not already active.
-# Silently skips when VIRTUAL_ENV is already set (e.g. in CI or nested calls).
+# Skips when VIRTUAL_ENV is set (e.g. in CI or nested calls) AND the active `python3` actually
+# resolves inside it -- a stale/wrong VIRTUAL_ENV left over from an unrelated shell session (e.g.
+# a different project, or a venv that was since removed) otherwise makes every script silently
+# skip activation and then fail on missing packages instead of falling through to the resolved
+# project venv below.
 activate_venv() {
     if [[ -n ${VIRTUAL_ENV:-} ]]; then
-        return 0
+        local active_python
+        active_python="$(command -v python3 2>/dev/null || true)"
+        if [[ -n $active_python ]] &&
+            [[ "$(realpath -q "$active_python" 2>/dev/null)" == "$(realpath -q "$VIRTUAL_ENV" 2>/dev/null)"/* ]]; then
+            return 0
+        fi
     fi
     local venv_path
     if ! venv_path="$(resolve_venv_path)"; then
