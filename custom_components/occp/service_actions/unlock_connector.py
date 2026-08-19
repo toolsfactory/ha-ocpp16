@@ -2,6 +2,7 @@
 
 import voluptuous as vol
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.core.domain.commands import CommandError
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
@@ -20,5 +21,7 @@ async def _handle_unlock_connector(hass: HomeAssistant, call: ServiceCall) -> Se
     try:
         result = await entry_data.app.command_service.unlock_connector(charge_point_id, connector_id)
     except CommandError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
+        ) from err
     return {"status": result.status}

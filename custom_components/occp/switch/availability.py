@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.coordinator import OccpCoordinator
 from custom_components.occp.core.domain.commands import CommandError
 from custom_components.occp.runtime import OccpEntryData
@@ -53,11 +54,17 @@ class OccpAvailabilitySwitch(_OccpConnectorSwitchBase):
                 self._charge_point_id, self._connector_id, availability_type
             )
         except CommandError as err:
-            raise HomeAssistantError(str(err)) from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_rejected",
+                translation_placeholders={"error": str(err)},
+            ) from err
         self._last_change_status = result.status
         if result.status == "Rejected":
             raise HomeAssistantError(
-                f"Ladestation hat die Verfügbarkeitsänderung abgelehnt (connector {self._connector_id})."
+                translation_domain=DOMAIN,
+                translation_key="availability_change_rejected",
+                translation_placeholders={"connector_id": str(self._connector_id)},
             )
         # REQ-0021 AC2: "Scheduled" wird NICHT als sofortige Zustandsänderung
         # behandelt -- der tatsächliche Zustand ergibt sich weiterhin

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.coordinator import OccpCoordinator
 from custom_components.occp.core.domain.commands import CommandError
 from custom_components.occp.runtime import OccpEntryData
@@ -34,28 +35,45 @@ class OccpStartStopSwitch(_OccpConnectorSwitchBase):
         """Remote-start a transaction using the configured default idTag."""
         id_tag = self._entry_data.default_id_tag
         if not id_tag:
-            raise HomeAssistantError(
-                "Kein idTag für Remote-Start konfiguriert (REQ-0020) -- bitte "
-                "beim Einrichten der OCCP-Integration ein idTag hinterlegen."
-            )
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="no_default_id_tag")
         try:
             result = await self._entry_data.app.command_service.remote_start_transaction(
                 self._charge_point_id, self._connector_id, id_tag
             )
         except CommandError as err:
-            raise HomeAssistantError(str(err)) from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_rejected",
+                translation_placeholders={"error": str(err)},
+            ) from err
         if not result.accepted:
-            raise HomeAssistantError(f"Ladestation hat den Startbefehl abgelehnt (connector {self._connector_id}).")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="start_rejected",
+                translation_placeholders={"connector_id": str(self._connector_id)},
+            )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Remote-stop the connector's active transaction, if any."""
         active = self._entry_data.app.query_service.get_active_transactions(self._charge_point_id)
         transaction = next((t for t in active if t.connector_id == self._connector_id), None)
         if transaction is None:
-            raise HomeAssistantError(f"Keine aktive Transaktion an connector {self._connector_id}.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="no_active_transaction",
+                translation_placeholders={"connector_id": str(self._connector_id)},
+            )
         try:
             result = await self._entry_data.app.command_service.remote_stop_transaction(transaction.transaction_id)
         except CommandError as err:
-            raise HomeAssistantError(str(err)) from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_rejected",
+                translation_placeholders={"error": str(err)},
+            ) from err
         if not result.accepted:
-            raise HomeAssistantError(f"Ladestation hat den Stoppbefehl abgelehnt (connector {self._connector_id}).")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="stop_rejected",
+                translation_placeholders={"connector_id": str(self._connector_id)},
+            )

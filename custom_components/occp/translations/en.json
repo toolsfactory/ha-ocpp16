@@ -2,45 +2,45 @@
   "config": {
     "step": {
       "user": {
-        "title": "OCCP Central System einrichten",
-        "description": "Listen-Adresse und -Port für den OCPP-1.6-WebSocket-Endpunkt (nur ws://, siehe REQ-0016). Optional: Pfad zur statischen idTag-Autorisierungsliste sowie ein fest konfiguriertes idTag für Remote-Start (REQ-0020) -- beides später über \"Konfigurieren\" änderbar.",
+        "title": "Set up OCCP Central System",
+        "description": "Listen address and port for the OCPP 1.6 WebSocket endpoint (ws:// only, see REQ-0016). Optional: a path to a static idTag authorization list, and a fixed idTag for remote start (REQ-0020) -- both changeable later via \"Configure\".",
         "data": {
-          "host": "Host/Bind-Adresse",
+          "host": "Host / bind address",
           "port": "Port",
-          "authorization_file": "Pfad zur idTag-Autorisierungsliste (optional)",
-          "default_id_tag": "idTag für Remote-Start (optional)"
+          "authorization_file": "Path to the idTag authorization list (optional)",
+          "default_id_tag": "idTag for remote start (optional)"
         },
         "data_description": {
-          "host": "Netzwerkadresse, auf der der OCPP-1.6-WebSocket-Server auf Charge Points wartet.",
-          "port": "Port, auf dem der OCPP-1.6-WebSocket-Server auf Charge Points wartet.",
-          "authorization_file": "Pfad zu einer JSON-Datei mit einer statischen Liste erlaubter idTags.",
-          "default_id_tag": "idTag, das der Start/Stop-Schalter für RemoteStartTransaction verwendet."
+          "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
+          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points.",
+          "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
         }
       }
     },
     "error": {
-      "port_in_use": "Der Port ist bereits belegt. Bitte einen anderen Port wählen.",
-      "invalid_authorization_file": "Die Datei ist nicht lesbar oder enthält kein gültiges JSON."
+      "port_in_use": "The port is already in use. Please choose a different port.",
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON."
     },
     "abort": {
-      "already_configured": "Diese Central-System-Instanz (Host/Port) ist bereits eingerichtet."
+      "already_configured": "This Central System instance (host/port) is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
         "data": {
-          "authorization_file": "Pfad zur idTag-Autorisierungsliste (optional)",
-          "default_id_tag": "idTag für Remote-Start (optional)"
+          "authorization_file": "Path to the idTag authorization list (optional)",
+          "default_id_tag": "idTag for remote start (optional)"
         },
         "data_description": {
-          "authorization_file": "Pfad zu einer JSON-Datei mit einer statischen Liste erlaubter idTags.",
-          "default_id_tag": "idTag, das der Start/Stop-Schalter für RemoteStartTransaction verwendet."
+          "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
         }
       }
     },
     "error": {
-      "invalid_authorization_file": "Die Datei ist nicht lesbar oder enthält kein gültiges JSON."
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON."
     }
   },
   "entity": {
@@ -76,50 +76,88 @@
   },
   "services": {
     "set_power_limit": {
-      "name": "Leistungsgrenze setzen",
-      "description": "Setzt die Ladeleistungsgrenze eines Connectors (Interop-Vertrag Fähigkeit 3).",
+      "name": "Set power limit",
+      "description": "Sets a connector's charging power limit (interop contract capability 3).",
       "fields": {
-        "limit_w": { "name": "Grenzwert", "description": "Leistungsgrenze in Watt." },
-        "phases": { "name": "Phasen", "description": "Optionale Phasenzahl (1-3)." }
+        "limit_w": { "name": "Limit", "description": "Power limit in watts." },
+        "phases": { "name": "Phases", "description": "Optional number of phases (1-3)." }
       }
     },
     "clear_power_limit": {
-      "name": "Leistungsgrenze löschen",
-      "description": "Entfernt eine zuvor gesetzte Ladeleistungsgrenze (Interop-Vertrag Fähigkeit 4)."
+      "name": "Clear power limit",
+      "description": "Removes a previously set charging power limit (interop contract capability 4)."
     },
     "authorize_id_token": {
-      "name": "idToken autorisieren",
-      "description": "Fragt OCCPs Autorisierungsquelle für ein idToken ab (Interop-Vertrag Fähigkeit 8).",
+      "name": "Authorize idToken",
+      "description": "Queries OCCP's authorization source for an idToken (interop contract capability 8).",
       "fields": {
-        "charge_point_id": { "name": "Charge-Point-ID", "description": "Identität des Ladepunkts." },
-        "id_token": { "name": "idToken", "description": "Zu prüfendes idToken." }
+        "charge_point_id": { "name": "Charge point ID", "description": "Identity of the charge point." },
+        "id_token": { "name": "idToken", "description": "idToken to check." }
       }
     },
     "reset": {
-      "name": "Zurücksetzen",
-      "description": "Setzt die Ladestation zurück (Soft oder Hard Reset).",
+      "name": "Reset",
+      "description": "Resets the charging station (soft or hard reset).",
       "fields": {
-        "reset_type": { "name": "Art", "description": "Soft (Neustart der Software) oder Hard (Neustart der Hardware)." }
+        "reset_type": { "name": "Type", "description": "Soft (restart the software) or Hard (restart the hardware)." }
       }
     },
     "unlock_connector": {
-      "name": "Connector entriegeln",
-      "description": "Fordert die Ladestation auf, den Connector zu entriegeln."
+      "name": "Unlock connector",
+      "description": "Asks the charging station to unlock the connector."
     },
     "get_configuration": {
-      "name": "Konfiguration abfragen",
-      "description": "Liest Konfigurationswerte der Ladestation aus.",
+      "name": "Get configuration",
+      "description": "Reads configuration values from the charging station.",
       "fields": {
-        "keys": { "name": "Schlüssel", "description": "Optionale Liste abzufragender Konfigurationsschlüssel -- leer lassen für alle." }
+        "keys": { "name": "Keys", "description": "Optional list of configuration keys to query -- leave empty for all." }
       }
     },
     "change_configuration": {
-      "name": "Konfiguration ändern",
-      "description": "Setzt einen einzelnen Konfigurationswert der Ladestation.",
+      "name": "Change configuration",
+      "description": "Sets a single configuration value on the charging station.",
       "fields": {
-        "key": { "name": "Schlüssel", "description": "Name des Konfigurationsschlüssels." },
-        "value": { "name": "Wert", "description": "Neuer Wert für den Konfigurationsschlüssel." }
+        "key": { "name": "Key", "description": "Name of the configuration key." },
+        "value": { "name": "Value", "description": "New value for the configuration key." }
       }
+    }
+  },
+  "exceptions": {
+    "device_not_found": {
+      "message": "Unknown device \"{device_id}\"."
+    },
+    "device_entry_not_loaded": {
+      "message": "Device \"{device_id}\" belongs to no loaded OCCP config entry."
+    },
+    "device_not_connector": {
+      "message": "Device \"{device_id}\" is not an OCCP connector (it may be the charge point itself) -- this action requires a connector device."
+    },
+    "device_is_connector": {
+      "message": "Device \"{device_id}\" is a connector -- this action requires the charge point device itself."
+    },
+    "device_not_occp": {
+      "message": "Device \"{device_id}\" does not belong to OCCP."
+    },
+    "unknown_charge_point": {
+      "message": "Unknown charge point \"{charge_point_id}\"."
+    },
+    "command_rejected": {
+      "message": "{error}"
+    },
+    "no_default_id_tag": {
+      "message": "No idTag configured for remote start (REQ-0020) -- please set one when configuring the OCCP integration."
+    },
+    "start_rejected": {
+      "message": "Charging station rejected the start command (connector {connector_id})."
+    },
+    "no_active_transaction": {
+      "message": "No active transaction on connector {connector_id}."
+    },
+    "stop_rejected": {
+      "message": "Charging station rejected the stop command (connector {connector_id})."
+    },
+    "availability_change_rejected": {
+      "message": "Charging station rejected the availability change (connector {connector_id})."
     }
   }
 }

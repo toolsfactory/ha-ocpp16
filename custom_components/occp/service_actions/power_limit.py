@@ -2,6 +2,7 @@
 
 import voluptuous as vol
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.core.domain.commands import CommandError
 from custom_components.occp.utils import interop
 from homeassistant.const import ATTR_DEVICE_ID
@@ -39,7 +40,9 @@ async def _handle_set_power_limit(hass: HomeAssistant, call: ServiceCall) -> Ser
             call.data.get(ATTR_PHASES),
         )
     except CommandError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
+        ) from err
 
 
 async def _handle_clear_power_limit(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
@@ -47,4 +50,6 @@ async def _handle_clear_power_limit(hass: HomeAssistant, call: ServiceCall) -> S
     try:
         return await interop.clear_power_limit(entry_data.app.command_service, charge_point_id, connector_id)
     except CommandError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
+        ) from err

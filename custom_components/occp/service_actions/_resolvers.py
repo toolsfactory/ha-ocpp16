@@ -18,7 +18,11 @@ def _get_device_entry(hass: HomeAssistant, call: ServiceCall) -> dr.DeviceEntry:
     device_id: str = call.data[ATTR_DEVICE_ID]
     device_entry = dr.async_get(hass).async_get(device_id)
     if device_entry is None:
-        raise ServiceValidationError(f"Unbekanntes Gerät '{device_id}'.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="device_not_found",
+            translation_placeholders={"device_id": device_id},
+        )
     return device_entry
 
 
@@ -34,7 +38,11 @@ def _entry_data_for_device(hass: HomeAssistant, device_entry: dr.DeviceEntry) ->
     entry_id = device_entry.config_entry_id
     entry = hass.config_entries.async_get_entry(entry_id) if entry_id else None
     if entry is None or entry.state is not entry.state.LOADED:
-        raise ServiceValidationError(f"Gerät '{device_entry.id}' gehört zu keinem geladenen OCCP-Eintrag.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="device_entry_not_loaded",
+            translation_placeholders={"device_id": device_entry.id},
+        )
     return entry.runtime_data
 
 
@@ -51,8 +59,9 @@ def _resolve_single_connector_device(hass: HomeAssistant, call: ServiceCall) -> 
             return _entry_data_for_device(hass, device_entry), charge_point_id, connector_id
 
     raise ServiceValidationError(
-        f"Gerät '{device_entry.id}' ist kein OCCP-Connector (sondern z. B. die "
-        "Ladestation selbst) -- dieser Service benötigt ein Connector-Gerät."
+        translation_domain=DOMAIN,
+        translation_key="device_not_connector",
+        translation_placeholders={"device_id": device_entry.id},
     )
 
 
@@ -65,14 +74,20 @@ def _resolve_charge_point_device(hass: HomeAssistant, call: ServiceCall) -> tupl
             continue
         if parse_connector_identifier(identifier) is not None:
             raise ServiceValidationError(
-                f"Gerät '{device_entry.id}' ist ein Connector -- dieser Service benötigt das Charge-Point-Gerät selbst."
+                translation_domain=DOMAIN,
+                translation_key="device_is_connector",
+                translation_placeholders={"device_id": device_entry.id},
             )
         charge_point_id = parse_charge_point_identifier(identifier)
         if charge_point_id is None:
             continue
         return _entry_data_for_device(hass, device_entry), charge_point_id
 
-    raise ServiceValidationError(f"Gerät '{device_entry.id}' gehört nicht zu OCCP.")
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="device_not_occp",
+        translation_placeholders={"device_id": device_entry.id},
+    )
 
 
 def _find_entry_data(hass: HomeAssistant, charge_point_id: str) -> OccpEntryData | None:

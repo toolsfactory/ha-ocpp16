@@ -2,6 +2,7 @@
 
 import voluptuous as vol
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.utils import interop
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import ServiceValidationError
@@ -26,5 +27,9 @@ async def _handle_authorize_id_token(hass: HomeAssistant, call: ServiceCall) -> 
     charge_point_id = call.data[ATTR_CHARGE_POINT_ID]
     entry_data = _find_entry_data(hass, charge_point_id)
     if entry_data is None:
-        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_charge_point",
+            translation_placeholders={"charge_point_id": charge_point_id},
+        )
     return interop.authorize_id_token(entry_data.app.authorization, call.data[ATTR_ID_TOKEN])

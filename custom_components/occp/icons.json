@@ -1,0 +1,35 @@
+{
+  "entity": {
+    "sensor": {
+      "charge_point_state": {
+        "default": "mdi:ev-station",
+        "state": {
+          "not_connected": "mdi:power-plug-off",
+          "ready": "mdi:power-plug",
+          "charging": "mdi:battery-charging",
+          "unavailable": "mdi:alert-circle",
+          "error": "mdi:alert"
+        }
+      },
+      "active_phases": {
+        "default": "mdi:sine-wave"
+      }
+    },
+    "switch": {
+      "start_stop": {
+        "default": "mdi:play-circle",
+        "state": {
+          "on": "mdi:battery-charging",
+          "off": "mdi:play-circle-outline"
+        }
+      },
+      "availability": {
+        "default": "mdi:toggle-switch",
+        "state": {
+          "on": "mdi:toggle-switch",
+          "off": "mdi:toggle-switch-off"
+        }
+      }
+    }
+  }
+}

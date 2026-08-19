@@ -2,6 +2,7 @@
 
 import voluptuous as vol
 
+from custom_components.occp.const import DOMAIN
 from custom_components.occp.core.domain.commands import CommandError
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
@@ -38,7 +39,9 @@ async def _handle_get_configuration(hass: HomeAssistant, call: ServiceCall) -> S
     try:
         result = await entry_data.app.command_service.get_configuration(charge_point_id, call.data.get(ATTR_KEYS))
     except CommandError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
+        ) from err
     return {
         "entries": [{"key": entry.key, "value": entry.value, "readonly": entry.readonly} for entry in result.entries],
         "unknown_keys": list(result.unknown_keys),
@@ -52,5 +55,7 @@ async def _handle_change_configuration(hass: HomeAssistant, call: ServiceCall) -
             charge_point_id, call.data[ATTR_KEY], call.data[ATTR_VALUE]
         )
     except CommandError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
+        ) from err
     return {"status": result.status}
