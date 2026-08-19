@@ -50,7 +50,7 @@ from .power_limit import (
 from .reset import _RESET_SCHEMA, SERVICE_RESET, _handle_reset
 from .unlock_connector import _UNLOCK_CONNECTOR_SCHEMA, SERVICE_UNLOCK_CONNECTOR, _handle_unlock_connector
 
-__all__ = ["async_register_services", "async_unregister_services"]
+__all__ = ["async_register_services"]
 
 _ServiceHandler = Callable[[HomeAssistant, ServiceCall], Coroutine[Any, Any, ServiceResponse]]
 
@@ -88,12 +88,3 @@ def async_register_services(hass: HomeAssistant) -> None:
             schema=schema,
             supports_response=SupportsResponse.ONLY,
         )
-
-
-def async_unregister_services(hass: HomeAssistant) -> None:
-    """Gegenstück zu ``async_register_services``.
-
-    Wird aufgerufen, sobald der letzte Config Entry entladen wurde (siehe ``__init__.py``).
-    """
-    for service, _schema, _handler in _SERVICES:
-        hass.services.async_remove(DOMAIN, service)

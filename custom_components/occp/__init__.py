@@ -24,7 +24,7 @@ from .const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF
 from .coordinator import OccpCoordinator
 from .entity_utils.device import charge_point_device_info
 from .runtime import OccpConfigEntry, OccpEntryData
-from .service_actions import async_register_services, async_unregister_services
+from .service_actions import async_register_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -118,12 +118,15 @@ async def _async_reload_on_options_update(hass: HomeAssistant, entry: OccpConfig
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool:
-    """Stop the entry's `CentralSystemApp` and unload its platforms."""
+    """Stop the entry's `CentralSystemApp` and unload its platforms.
+
+    Services registered in ``async_setup()`` stay registered for the integration's lifetime --
+    ``async_setup()`` runs once per HA startup, not on every entry (re)load, so unregistering them
+    here would leave every OCCP service missing until the next full HA restart.
+    """
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         await entry.runtime_data.app.stop()
-        if not hass.config_entries.async_loaded_entries(DOMAIN):
-            async_unregister_services(hass)
     return unloaded
 
 
