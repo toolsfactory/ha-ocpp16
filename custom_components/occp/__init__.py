@@ -16,7 +16,7 @@ from custom_components.occp.core.config import AppConfig
 from custom_components.occp.core.domain.authorization import StaticAuthorizationProvider
 from custom_components.occp.core.domain.models import StateChangeEvent
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
@@ -51,11 +51,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
         port=entry.data[CONF_PORT],
         authorization_file=authorization_path,
     )
-    authorization = (
-        await hass.async_add_executor_job(StaticAuthorizationProvider.from_json_file, authorization_path)
-        if authorization_path is not None
-        else None
-    )
+    if authorization_path is not None:
+        try:
+            authorization = await hass.async_add_executor_job(
+                StaticAuthorizationProvider.from_json_file, authorization_path
+            )
+        except (OSError, ValueError) as err:
+            # Der Options-Flow validiert dieselbe Datei beim Speichern (siehe
+            # config_flow_handler/validators/authorization.py) -- dieser Zweig
+            # greift, wenn die Datei danach entfernt/beschädigt wurde. Kein
+            # ConfigEntryNotReady: ein erneuter Versuch ohne Eingreifen des
+            # Nutzers würde denselben Fehler wiederholen.
+            raise ConfigEntryError(f"Autorisierungsdatei '{authorization_path}' nicht lesbar: {err}") from err
+    else:
+        authorization = None
     app = CentralSystemApp(config, authorization=authorization)
     try:
         await app.start()

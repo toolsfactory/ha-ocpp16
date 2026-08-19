@@ -19,7 +19,8 @@
       }
     },
     "error": {
-      "port_in_use": "Der Port ist bereits belegt. Bitte einen anderen Port wählen."
+      "port_in_use": "Der Port ist bereits belegt. Bitte einen anderen Port wählen.",
+      "invalid_authorization_file": "Die Datei ist nicht lesbar oder enthält kein gültiges JSON."
     },
     "abort": {
       "already_configured": "Diese Central-System-Instanz (Host/Port) ist bereits eingerichtet."
@@ -37,6 +38,9 @@
           "default_id_tag": "idTag, das der Start/Stop-Schalter für RemoteStartTransaction verwendet."
         }
       }
+    },
+    "error": {
+      "invalid_authorization_file": "Die Datei ist nicht lesbar oder enthält kein gültiges JSON."
     }
   },
   "entity": {

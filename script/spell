@@ -26,7 +26,7 @@ run_hook "spell" "pre"
 log_header "Running codespell with auto-fix"
 codespell \
     --write-changes \
-    --ignore-words-list=aiport,astroid,checkin,currenty,hass,iif,incomfort,lookin,nam,NotIn,Alle,Interaktive,Intervall,Methode,Methoden,Modul,Moduls,Negativ,Plattform,Startet,Stopp,Toleranz,aktive,alle,als,asynchron,explizit,interaktive,ist,lokal,oder,relativ,sie,unser,unter,vor,Aktion \
+    --ignore-words-list=aiport,astroid,checkin,currenty,hass,iif,incomfort,lookin,nam,NotIn,Alle,Interaktive,Intervall,Methode,Methoden,Modul,Moduls,Negativ,Plattform,Startet,Stopp,Toleranz,aktive,alle,als,asynchron,explizit,interaktive,ist,lokal,oder,relativ,separat,sie,unser,unter,vor,Aktion \
     --skip="./.*,*.csv,*.json,*.ambr,uv.lock" \
     --quiet-level=2 \
     custom_components/ \

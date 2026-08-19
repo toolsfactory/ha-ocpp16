@@ -29,6 +29,7 @@ from custom_components.occp.const import (
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 
 from .options_flow import OPTIONS_SCHEMA, OccpOptionsFlow
+from .validators.authorization import validate_authorization_file
 
 
 def _try_bind_port(host: str, port: int) -> None:
@@ -61,17 +62,23 @@ class OccpConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._host_port_already_configured(host, port):
                 return self.async_abort(reason="already_configured")
 
+            authorization_file = user_input.get(CONF_AUTHORIZATION_FILE, "")
             try:
                 await self.hass.async_add_executor_job(_try_bind_port, host, port)
             except OSError:
                 errors["port"] = "port_in_use"
-            else:
+            if not errors and authorization_file:
+                try:
+                    await self.hass.async_add_executor_job(validate_authorization_file, authorization_file)
+                except OSError, ValueError:
+                    errors[CONF_AUTHORIZATION_FILE] = "invalid_authorization_file"
+            if not errors:
                 await self.async_set_unique_id(str(uuid4()))
                 return self.async_create_entry(
                     title=f"OCCP ({host}:{port})",
                     data={CONF_HOST: host, CONF_PORT: port},
                     options={
-                        CONF_AUTHORIZATION_FILE: user_input.get(CONF_AUTHORIZATION_FILE, ""),
+                        CONF_AUTHORIZATION_FILE: authorization_file,
                         CONF_DEFAULT_ID_TAG: user_input.get(CONF_DEFAULT_ID_TAG, ""),
                     },
                 )
