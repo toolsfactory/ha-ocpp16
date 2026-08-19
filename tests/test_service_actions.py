@@ -69,6 +69,57 @@ async def test_set_and_clear_power_limit(
     assert response == {"status": "accepted"}
 
 
+async def test_set_power_limit_rejected_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """A power limit the charge point rejects must fail the service call, not return status data.
+
+    Breaking change (2026-08-19, see DECISIONS.md): set_power_limit/clear_power_limit used to
+    return {"status": "rejected"|"not_supported"|"unknown"} as ordinary successful response data.
+    """
+    _, connector_device_id = booted_charge_point
+    mock_charge_point_connection.set_charging_profile.return_value = "Rejected"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SET_POWER_LIMIT,
+            {"device_id": connector_device_id, "limit_w": 4000},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_set_power_limit_not_supported_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """ "NotSupported" is also a rejection, not a successful outcome."""
+    _, connector_device_id = booted_charge_point
+    mock_charge_point_connection.set_charging_profile.return_value = "NotSupported"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SET_POWER_LIMIT,
+            {"device_id": connector_device_id, "limit_w": 4000},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_clear_power_limit_unknown_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """ "Unknown" (no matching profile to clear) is also a rejection, not a successful outcome."""
+    _, connector_device_id = booted_charge_point
+    mock_charge_point_connection.clear_charging_profile.return_value = "Unknown"
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_CLEAR_POWER_LIMIT, {"device_id": connector_device_id}, blocking=True, return_response=True
+        )
+
+
 async def test_authorize_id_token(hass: HomeAssistant, booted_charge_point: tuple[str, str]) -> None:
     """Fähigkeit 8: an unknown idTag returns a structured `invalid` response, not an exception."""
     response = await hass.services.async_call(

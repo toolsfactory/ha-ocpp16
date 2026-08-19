@@ -319,6 +319,38 @@ diagnostics being free of anything sensitive.
 
 ---
 
+### `set_power_limit`/`clear_power_limit` raise on rejection (reversed from the original data-return contract)
+
+**Date:** 2026-08-19
+
+**Context:** REQ-0035 capabilities 3/4 originally returned `{"status": "accepted"|"rejected"|
+"not_supported"}` (set) and `{"status": "accepted"|"unknown"}` (clear) as ordinary successful
+service data, documented as the stable interop contract for the separate load-management
+integration. A 2026-08-19 QUALITY_REVIEW.md pass pointed out the direct consequence: Home Assistant
+and any automation checking only for a raised error sees a charge point's outright rejection of a
+power-limit change as a successful call, and this data-return shape is what blocks the Silver
+Quality Scale rule `action-exceptions` — the same rule the previous round's fix for `reset`/
+`unlock_connector`/`change_configuration` satisfied by raising instead.
+
+**Decision:** Confirmed explicitly with the maintainer (this is pre-1.0, where `AGENTS.md`'s own
+default is to prefer breaking over compatibility scaffolding): both services now raise
+`ServiceValidationError` when the charge point does not respond `"Accepted"`, matching the pattern
+already used by every other mutating OCCP service. A successful call still returns
+`{"status": "accepted"}` — only the rejection path changed, from data to an exception.
+
+**Rationale:** Consistency with the rest of this integration's service surface outweighs keeping a
+contract shape that itself blocks a real Quality Scale rule. Reversing this pre-1.0, while the
+separate load-management integration can still absorb the change cheaply, is far less costly than
+reversing it later.
+
+**Consequences:** Breaking change to the documented REQ-0035 interop contract — the one thing this
+project has been most careful to keep stable for the separate load-management integration all
+session. `INTEROP_CONTRACT.md`'s capability 3/4 rows are updated to match. A caller that previously
+branched on `result["status"]` must now catch `ServiceValidationError` instead; a caller that only
+checked for a raised error to detect failure needs no changes at all.
+
+---
+
 ## Future Considerations
 
 ### State Restoration

@@ -32,7 +32,7 @@ _CLEAR_POWER_LIMIT_SCHEMA = vol.Schema({vol.Required(ATTR_DEVICE_ID): cv.string}
 async def _handle_set_power_limit(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     entry_data, charge_point_id, connector_id = _resolve_single_connector_device(hass, call)
     try:
-        return await interop.set_power_limit(
+        result = await interop.set_power_limit(
             entry_data.app.command_service,
             charge_point_id,
             connector_id,
@@ -43,13 +43,27 @@ async def _handle_set_power_limit(hass: HomeAssistant, call: ServiceCall) -> Ser
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
         ) from err
+    if result["status"] != "accepted":
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="power_limit_rejected",
+            translation_placeholders={"status": result["status"]},
+        )
+    return result
 
 
 async def _handle_clear_power_limit(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     entry_data, charge_point_id, connector_id = _resolve_single_connector_device(hass, call)
     try:
-        return await interop.clear_power_limit(entry_data.app.command_service, charge_point_id, connector_id)
+        result = await interop.clear_power_limit(entry_data.app.command_service, charge_point_id, connector_id)
     except CommandError as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_rejected", translation_placeholders={"error": str(err)}
         ) from err
+    if result["status"] != "accepted":
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="power_limit_rejected",
+            translation_placeholders={"status": result["status"]},
+        )
+    return result

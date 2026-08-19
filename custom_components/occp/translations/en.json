@@ -180,6 +180,9 @@
     "change_configuration_rejected": {
       "message": "Charging station rejected the configuration change (status: {status})."
     },
+    "power_limit_rejected": {
+      "message": "Charging station rejected the power limit change (status: {status})."
+    },
     "no_default_id_tag": {
       "message": "No idTag configured for remote start (REQ-0020) -- please set one when configuring the OCCP integration."
     },
