@@ -162,6 +162,12 @@
     "unknown_charge_point": {
       "message": "Unknown charge point \"{charge_point_id}\"."
     },
+    "authorization_file_unreadable": {
+      "message": "The authorization file \"{path}\" could not be read. Check that it still exists and contains valid JSON."
+    },
+    "bind_failed": {
+      "message": "Could not bind the WebSocket server to {host}:{port}. Check that nothing else is using this port."
+    },
     "command_rejected": {
       "message": "{error}"
     },

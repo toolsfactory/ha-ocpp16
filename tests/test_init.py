@@ -1,6 +1,7 @@
 """Tests for setup and unload of the occp integration."""
 
 from collections.abc import Callable
+from unittest.mock import patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -30,6 +31,20 @@ async def test_setup_and_unload(hass: HomeAssistant, init_integration: MockConfi
     assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
     assert init_integration.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_bind_failure_is_a_translated_config_entry_not_ready(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> None:
+    """A port bind failure at setup time is a translated ConfigEntryNotReady, not a raw OS error."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.occp.core.app.CentralSystemApp.start", side_effect=OSError("address in use")):
+        assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert mock_config_entry.error_reason_translation_key == "bind_failed"
 
 
 async def test_device_names_are_language_neutral(

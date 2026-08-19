@@ -61,16 +61,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: OccpConfigEntry) -> bool
             # config_flow_handler/validators/authorization.py) -- dieser Zweig
             # greift, wenn die Datei danach entfernt/beschädigt wurde. Kein
             # ConfigEntryNotReady: ein erneuter Versuch ohne Eingreifen des
-            # Nutzers würde denselben Fehler wiederholen.
-            raise ConfigEntryError(f"Autorisierungsdatei '{authorization_path}' nicht lesbar: {err}") from err
+            # Nutzers würde denselben Fehler wiederholen. Pfad/OS-Fehlertext nur auf
+            # Debug-Level -- die Nutzer-sichtbare Meldung bleibt übersetzt und generisch.
+            _LOGGER.debug("Authorization file '%s' could not be loaded: %s", authorization_path, err, exc_info=True)
+            raise ConfigEntryError(
+                translation_domain=DOMAIN,
+                translation_key="authorization_file_unreadable",
+                translation_placeholders={"path": str(authorization_path)},
+            ) from err
     else:
         authorization = None
     app = CentralSystemApp(config, authorization=authorization)
     try:
         await app.start()
     except OSError as err:
+        _LOGGER.debug("Could not bind %s:%s: %s", config.host, config.port, err, exc_info=True)
         raise ConfigEntryNotReady(
-            f"Konnte den WebSocket-Server nicht auf {config.host}:{config.port} binden: {err}"
+            translation_domain=DOMAIN,
+            translation_key="bind_failed",
+            translation_placeholders={"host": config.host, "port": str(config.port)},
         ) from err
 
     device_registry = dr.async_get(hass)

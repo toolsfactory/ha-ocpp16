@@ -413,3 +413,4 @@ async def test_setup_fails_cleanly_when_authorization_file_disappears_after_setu
     assert not await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.error_reason_translation_key == "authorization_file_unreadable"
