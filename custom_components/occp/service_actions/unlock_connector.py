@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from ._resolvers import _find_entry_data, _resolve_single_connector_device
+from ._resolvers import _resolve_single_connector_device
 
 SERVICE_UNLOCK_CONNECTOR = "unlock_connector"
 
@@ -16,10 +16,7 @@ _UNLOCK_CONNECTOR_SCHEMA = vol.Schema({vol.Required(ATTR_DEVICE_ID): cv.string})
 
 
 async def _handle_unlock_connector(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    charge_point_id, connector_id = _resolve_single_connector_device(hass, call)
-    entry_data = _find_entry_data(hass, charge_point_id)
-    if entry_data is None:
-        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    entry_data, charge_point_id, connector_id = _resolve_single_connector_device(hass, call)
     try:
         result = await entry_data.app.command_service.unlock_connector(charge_point_id, connector_id)
     except CommandError as err:

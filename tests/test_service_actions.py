@@ -1,11 +1,12 @@
 """Tests for the 7 OCCP services in `service_actions/`."""
 
 from collections.abc import Callable
+from unittest.mock import AsyncMock
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import DOMAIN
+from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
 from custom_components.occp.entity_utils.device import connector_identifier
 from custom_components.occp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
 from custom_components.occp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
@@ -170,3 +171,53 @@ async def test_charge_point_device_rejected_for_connector_only_service(
             blocking=True,
             return_response=True,
         )
+
+
+async def test_service_call_reaches_the_device_s_own_entry_not_the_first_loaded_one(
+    hass: HomeAssistant,
+    mock_app_start_stop: None,
+    booted_charge_point: tuple[str, str],
+    mock_charge_point_connection: AsyncMock,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """Two entries whose registries both know `CHARGE_POINT_ID` -- the call must reach the right one.
+
+    Regression test for a bug where the resolver searched every loaded entry
+    for a matching `charge_point_id` and used whichever loaded first, instead
+    of the entry that actually owns the resolved device.
+    """
+    charge_point_device_id, _ = booted_charge_point
+
+    second_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCCP (0.0.0.0:9500)",
+        unique_id="second-entry-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+    )
+    second_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(second_entry.entry_id)
+    await hass.async_block_till_done()
+
+    second_connection = AsyncMock()
+    second_connection.reset.return_value = "Accepted"
+    boot_charge_point(second_entry.runtime_data.app, second_connection, charge_point_id=CHARGE_POINT_ID)
+    publish_state_change(second_entry.runtime_data.app, charge_point_id=CHARGE_POINT_ID, connector_id=None)
+    await hass.async_block_till_done()
+
+    second_charge_point_device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, CHARGE_POINT_ID), second_entry.entry_id
+    )
+    assert second_charge_point_device is not None
+    assert second_charge_point_device.id != charge_point_device_id
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_RESET,
+        {"device_id": second_charge_point_device.id, "reset_type": "Soft"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"accepted": True}
+    second_connection.reset.assert_awaited_with("Soft")
+    mock_charge_point_connection.reset.assert_not_awaited()

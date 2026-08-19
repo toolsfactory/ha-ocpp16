@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from ._resolvers import _find_entry_data, _resolve_charge_point_device
+from ._resolvers import _resolve_charge_point_device
 
 SERVICE_GET_CONFIGURATION = "get_configuration"
 SERVICE_CHANGE_CONFIGURATION = "change_configuration"
@@ -34,10 +34,7 @@ _CHANGE_CONFIGURATION_SCHEMA = vol.Schema(
 
 
 async def _handle_get_configuration(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    charge_point_id = _resolve_charge_point_device(hass, call)
-    entry_data = _find_entry_data(hass, charge_point_id)
-    if entry_data is None:
-        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    entry_data, charge_point_id = _resolve_charge_point_device(hass, call)
     try:
         result = await entry_data.app.command_service.get_configuration(charge_point_id, call.data.get(ATTR_KEYS))
     except CommandError as err:
@@ -49,10 +46,7 @@ async def _handle_get_configuration(hass: HomeAssistant, call: ServiceCall) -> S
 
 
 async def _handle_change_configuration(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
-    charge_point_id = _resolve_charge_point_device(hass, call)
-    entry_data = _find_entry_data(hass, charge_point_id)
-    if entry_data is None:
-        raise ServiceValidationError(f"Unbekannter Ladepunkt '{charge_point_id}'.")
+    entry_data, charge_point_id = _resolve_charge_point_device(hass, call)
     try:
         result = await entry_data.app.command_service.change_configuration(
             charge_point_id, call.data[ATTR_KEY], call.data[ATTR_VALUE]
