@@ -66,6 +66,18 @@ def _parse_timestamp(value: str) -> datetime:
     return parsed
 
 
+def _mask_id_tag(id_tag: str) -> str:
+    """Return `id_tag` masked for logging -- only the last 4 characters stay visible.
+
+    idTags identifieren einen konkreten Fahrer/eine Karte -- auf INFO-Level
+    (Standard-Sichtbarkeit, anders als das volle Frame-Logging auf DEBUG,
+    das bewusst Opt-in bleibt) sollen sie nicht im Klartext in Logs landen.
+    """
+    if len(id_tag) <= 4:
+        return "*" * len(id_tag)
+    return f"{'*' * (len(id_tag) - 4)}{id_tag[-4:]}"
+
+
 def _to_id_tag_info(decision: AuthorizationDecision) -> ocpp_datatypes.IdTagInfo:
     return ocpp_datatypes.IdTagInfo(
         status=ocpp_enums.AuthorizationStatus(decision.status.value),
@@ -270,7 +282,7 @@ class ChargePointHandler(OcppChargePoint):
     async def on_authorize(self, id_tag: str, **kwargs: object) -> ocpp_call_result.Authorize:
         """Handle Authorize.req: return the idTag's authorization status."""
         decision = self._services.authorization.authorize(id_tag)
-        self.cp_logger.info("Authorize idTag=%s -> %s", id_tag, decision.status.value)
+        self.cp_logger.info("Authorize idTag=%s -> %s", _mask_id_tag(id_tag), decision.status.value)
         return ocpp_call_result.Authorize(id_tag_info=_to_id_tag_info(decision))
 
     @on(ocpp_enums.Action.start_transaction)
@@ -297,7 +309,7 @@ class ChargePointHandler(OcppChargePoint):
             "Transaktion %s gestartet: connector=%s idTag=%s meterStart=%s idTagStatus=%s",
             transaction.transaction_id,
             connector_id,
-            id_tag,
+            _mask_id_tag(id_tag),
             meter_start,
             decision.status.value,
         )
