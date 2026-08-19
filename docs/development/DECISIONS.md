@@ -263,6 +263,35 @@ a shape change to any existing entity's state or attributes.
 
 ---
 
+### Unmapped measurand sensors are disabled by default
+
+**Date:** 2026-08-19
+
+**Context:** `OccpMeasurandSensor` is created dynamically for every measurand a charge point
+actually reports, including ones outside `_MEASURAND_META` that OCCP does not recognize well
+enough to assign a `device_class`/`state_class` to. Every one of them appeared enabled by default,
+regardless of how common or useful it actually is (Quality Scale rule
+`entity-disabled-by-default`).
+
+**Decision:** `_attr_entity_registry_enabled_default = measurand in _MEASURAND_META`. The
+measurands OCCP already recognizes (energy, power, current, voltage, temperature, state of
+charge) stay enabled by default; anything outside that set is registered but disabled, reachable
+through the entity registry like any other disabled-by-default entity.
+
+**Rationale:** This is a judgment call, not a precisely specified rule — the alternative would be
+hand-picking specific measurands as noisy/diagnostic, which requires knowing in advance what
+charge points report, information this project doesn't have. Splitting on "does OCCP already
+recognize this measurand" is the least surprising line available: every measurand a typical user
+already depends on (the ones with a real unit/device_class) is unaffected, and only genuinely
+unknown/unclassified readings default to hidden.
+
+**Consequences:** A charge point reporting a measurand outside `_MEASURAND_META` no longer clutters
+the entity list unasked; a user who wants it enables it once via the entity registry. Not a
+breaking change — no existing enabled entity becomes disabled, since every measurand that was ever
+enabled by default is, by construction, already in `_MEASURAND_META`.
+
+---
+
 ## Future Considerations
 
 ### State Restoration

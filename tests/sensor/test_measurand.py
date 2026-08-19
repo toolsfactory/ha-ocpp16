@@ -38,6 +38,7 @@ async def test_new_measurand_creates_a_sensor_with_mapped_unit_and_device_class(
     )
     entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
+    assert er.async_get(hass).async_get(entity_id).disabled_by is None
 
     state = hass.states.get(entity_id)
     assert state.state == "12345.0"
@@ -103,7 +104,13 @@ async def test_unmapped_measurand_still_gets_a_sensor(
     publish_state_change: Callable[..., None],
     record_meter_sample: Callable[..., None],
 ) -> None:
-    """A measurand outside `_MEASURAND_META` still creates a sensor, just without a device class."""
+    """A measurand outside `_MEASURAND_META` still registers a sensor, disabled by default.
+
+    Unmapped measurands get no `device_class`, and OCCP does not know whether the
+    charge point will report many of them or how noisy they are, so they are
+    registered but disabled by default (Quality Scale rule
+    `entity-disabled-by-default`) rather than appearing in the UI unasked.
+    """
     entry_data = init_integration.runtime_data
     boot_charge_point(entry_data.app, mock_charge_point_connection)
     record_meter_sample(entry_data.app, connector_id=1, measurand="RPM", value="1500", unit=None)
@@ -113,10 +120,9 @@ async def test_unmapped_measurand_still_gets_a_sensor(
     unique_id = f"{connector_identifier(init_integration.entry_id, CHARGE_POINT_ID, 1)}_measurand_rpm"
     entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, unique_id)
     assert entity_id is not None
-
-    state = hass.states.get(entity_id)
-    assert state.state == "1500"
-    assert "device_class" not in state.attributes
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    assert registry_entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert registry_entry.original_device_class is None
 
 
 async def test_invalid_numeric_value_does_not_crash(

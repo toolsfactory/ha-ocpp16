@@ -105,6 +105,11 @@ class OccpMeasurandSensor(_OccpConnectorSensorBase):
         device_class, state_class = _MEASURAND_META.get(measurand, (None, None))
         self._attr_device_class = device_class
         self._attr_state_class = state_class
+        # Measurands außerhalb _MEASURAND_META sind roh gemeldete OCPP-Werte, die OCCP nicht
+        # genug kennt, um ihnen eine device_class/state_class zuzuweisen (Quality-Scale-Regel
+        # entity-disabled-by-default) -- standardmäßig deaktiviert, über die Entity Registry
+        # aktivierbar, statt jede seltene/unbekannte Messgröße ungefragt in der UI aufzulisten.
+        self._attr_entity_registry_enabled_default = measurand in _MEASURAND_META
 
     @property
     def _sample(self) -> MeterSample | None:
