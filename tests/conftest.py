@@ -128,6 +128,7 @@ def record_meter_sample() -> Callable[..., None]:
         measurand: str,
         value: str,
         unit: str | None = None,
+        phase: str | None = None,
         transaction_id: int | None = None,
     ) -> None:
         app.meter_values.record(
@@ -140,7 +141,7 @@ def record_meter_sample() -> Callable[..., None]:
                     value=value,
                     unit=unit,
                     context="Sample.Periodic",
-                    phase=None,
+                    phase=phase,
                     recorded_at=datetime.now(UTC),
                 )
             ],
