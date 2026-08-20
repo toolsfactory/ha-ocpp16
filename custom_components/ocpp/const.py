@@ -6,7 +6,7 @@ Bewusst getrennt vom Standalone-Kern (``src/ocpp/``) gehalten -- keine
 
 DOMAIN = "ocpp"
 
-PLATFORMS = ["sensor", "switch", "button"]
+PLATFORMS = ["sensor", "switch", "button", "number"]
 
 # -- Config-Flow-Felder (REQ-0016, ADR-0008 Abschnitt 4) --------------------
 CONF_HOST = "host"
@@ -21,9 +21,14 @@ CONF_AUTHORIZATION_FILE = "authorization_file"
 # einzelnes, Config-Entry-weites idTag hierzu konsistent -- siehe
 # Abschlussbericht des developer-Agenten fuer die vollstaendige Begruendung.
 CONF_DEFAULT_ID_TAG = "default_id_tag"
+# Additiv: Obergrenze für das number.power_limit_w-Entity (kein Vertragsbestandteil,
+# siehe INTEROP_CONTRACT.md) -- nicht fest codiert, weil das real angeschlossene
+# Ladegerät selbst konfigurierbar ist (z. B. 11 kW oder 22 kW je nach Anschluss).
+CONF_MAX_POWER_LIMIT_W = "max_power_limit_w"
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 9000
+DEFAULT_MAX_POWER_LIMIT_W = 22000.0
 
 # -- Fähigkeit-7-Discovery-Bitmask (ADR-0010) --------------------------------
 CAP_BIT_CURRENT_POWER = 1  # Fähigkeit 1

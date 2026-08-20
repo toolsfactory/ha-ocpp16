@@ -39,6 +39,7 @@ from .configuration import (
     _handle_change_configuration,
     _handle_get_configuration,
 )
+from .get_diagnostics import _GET_DIAGNOSTICS_SCHEMA, SERVICE_GET_DIAGNOSTICS, _handle_get_diagnostics
 from .power_limit import (
     _CLEAR_POWER_LIMIT_SCHEMA,
     _SET_POWER_LIMIT_SCHEMA,
@@ -64,6 +65,7 @@ _SERVICES: tuple[tuple[str, vol.Schema, _ServiceHandler], ...] = (
     (SERVICE_GET_CONFIGURATION, _GET_CONFIGURATION_SCHEMA, _handle_get_configuration),
     (SERVICE_CHANGE_CONFIGURATION, _CHANGE_CONFIGURATION_SCHEMA, _handle_change_configuration),
     (SERVICE_TRIGGER_MESSAGE, _TRIGGER_MESSAGE_SCHEMA, _handle_trigger_message),
+    (SERVICE_GET_DIAGNOSTICS, _GET_DIAGNOSTICS_SCHEMA, _handle_get_diagnostics),
 )
 
 

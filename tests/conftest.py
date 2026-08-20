@@ -79,6 +79,7 @@ def mock_charge_point_connection() -> AsyncMock:
     connection.clear_charging_profile.return_value = "Accepted"
     connection.change_availability.return_value = "Accepted"
     connection.trigger_message.return_value = "Accepted"
+    connection.get_diagnostics.return_value = "diagnostics.zip"
     connection.get_composite_schedule.return_value = CompositeScheduleResult(
         status="Accepted", periods=[ChargingSchedulePeriodInfo(start_offset_seconds=0, limit_watts=5000.0)]
     )

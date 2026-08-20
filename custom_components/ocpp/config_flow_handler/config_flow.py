@@ -21,8 +21,10 @@ from custom_components.ocpp.const import (
     CONF_AUTHORIZATION_FILE,
     CONF_DEFAULT_ID_TAG,
     CONF_HOST,
+    CONF_MAX_POWER_LIMIT_W,
     CONF_PORT,
     DEFAULT_HOST,
+    DEFAULT_MAX_POWER_LIMIT_W,
     DEFAULT_PORT,
     DOMAIN,
 )
@@ -90,6 +92,7 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
                     options={
                         CONF_AUTHORIZATION_FILE: authorization_file,
                         CONF_DEFAULT_ID_TAG: user_input.get(CONF_DEFAULT_ID_TAG, ""),
+                        CONF_MAX_POWER_LIMIT_W: user_input.get(CONF_MAX_POWER_LIMIT_W, DEFAULT_MAX_POWER_LIMIT_W),
                     },
                 )
 

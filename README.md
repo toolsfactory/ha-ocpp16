@@ -143,14 +143,23 @@ instead, noted below.
   `ocpp.reset` service instead
 - **Unlock**: Sends UnlockConnector for this connector
 
+### Numbers
+
+- **Power Limit**: Sets or clears the connector's charging power limit (set to `0` to clear).
+  Dashboard-idiomatic alternative to the `ocpp.set_power_limit`/`ocpp.clear_power_limit` services,
+  calling the same underlying command. Its value is optimistic (the last value you successfully
+  set), not a live read of the charge point's actual limit — use the **Effective Power Limit**
+  sensor for that. Its maximum is the **Max Power Limit** setup option, not a fixed value.
+
 ## Custom Services
 
 `set_power_limit`, `clear_power_limit`, `authorize_id_token`, and the state/current-power/
 effective-power-limit/availability entities above together form a documented interface meant for a
 separate load-management integration to build against — see
 [`docs/development/INTEROP_CONTRACT.md`](docs/development/INTEROP_CONTRACT.md) if that's you. The
-four services below it (`reset`, `unlock_connector`, `get_configuration`, `change_configuration`)
-are useful operational actions but are not part of that contract.
+services below it (`reset`, `unlock_connector`, `get_configuration`, `change_configuration`,
+`trigger_message`, `get_diagnostics`) are useful operational actions but are not part of that
+contract.
 
 ### `ocpp.set_power_limit`
 
@@ -248,6 +257,20 @@ data:
   requested_message: StatusNotification
 ```
 
+### `ocpp.get_diagnostics`
+
+Ask the charge point to upload a diagnostics file to a location you provide (an FTP or HTTP(S)
+server you operate — this integration does not host one itself).
+
+```yaml
+service: ocpp.get_diagnostics
+data:
+  device_id: <charge point device id>
+  location: ftp://ops.example.com/diagnostics/
+  retries: 3 # optional
+  retry_interval: 30 # optional, seconds
+```
+
 ## Configuration Options
 
 ### During Setup
@@ -258,10 +281,12 @@ data:
 | Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)                                                                |
 | Authorization File | No       | Path to a JSON file with a static idTag allow-list. **Leaving this unset rejects every idTag**, not the other way around. |
 | Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command — must appear in the allow-list above                        |
+| Max Power Limit    | No       | Upper bound (in watts) for the **Power Limit** number entity — match your charge point's actual maximum (default `22000`) |
 
 Host and port are fixed once the entry is created (changing the listen address needs a new entry).
-Authorization File and Default idTag can be changed afterwards via **Settings** → **Devices &
-Services** → **OCPP** → **Configure** — this reloads the entry to apply the change.
+Authorization File, Default idTag, and Max Power Limit can be changed afterwards via
+**Settings** → **Devices & Services** → **OCPP** → **Configure** — this reloads the entry to apply
+the change.
 
 ## Troubleshooting
 

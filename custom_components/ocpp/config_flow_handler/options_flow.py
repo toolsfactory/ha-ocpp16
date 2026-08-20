@@ -10,7 +10,12 @@ from typing import Any
 
 import voluptuous as vol
 
-from custom_components.ocpp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG
+from custom_components.ocpp.const import (
+    CONF_AUTHORIZATION_FILE,
+    CONF_DEFAULT_ID_TAG,
+    CONF_MAX_POWER_LIMIT_W,
+    DEFAULT_MAX_POWER_LIMIT_W,
+)
 from custom_components.ocpp.core.domain.authorization import IdTagStatus
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
@@ -20,6 +25,9 @@ OPTIONS_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_AUTHORIZATION_FILE): str,
         vol.Optional(CONF_DEFAULT_ID_TAG): str,
+        vol.Optional(CONF_MAX_POWER_LIMIT_W, default=DEFAULT_MAX_POWER_LIMIT_W): vol.All(
+            vol.Coerce(float), vol.Range(min=0.01)
+        ),
     }
 )
 

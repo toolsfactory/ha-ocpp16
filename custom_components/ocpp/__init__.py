@@ -20,7 +20,16 @@ from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
+from .const import (
+    CONF_AUTHORIZATION_FILE,
+    CONF_DEFAULT_ID_TAG,
+    CONF_HOST,
+    CONF_MAX_POWER_LIMIT_W,
+    CONF_PORT,
+    DEFAULT_MAX_POWER_LIMIT_W,
+    DOMAIN,
+    PLATFORMS,
+)
 from .coordinator import OcppCoordinator
 from .entity_utils.device import charge_point_device_info
 from .runtime import OcppConfigEntry, OcppEntryData
@@ -109,6 +118,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OcppConfigEntry) -> bool
         app=app,
         coordinator=coordinator,
         default_id_tag=entry.options.get(CONF_DEFAULT_ID_TAG),
+        max_power_limit_w=entry.options.get(CONF_MAX_POWER_LIMIT_W, DEFAULT_MAX_POWER_LIMIT_W),
         entry_id=entry.entry_id,
     )
     entry.runtime_data = entry_data

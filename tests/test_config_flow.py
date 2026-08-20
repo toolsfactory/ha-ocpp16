@@ -4,7 +4,15 @@ from unittest.mock import patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp.const import (
+    CONF_AUTHORIZATION_FILE,
+    CONF_DEFAULT_ID_TAG,
+    CONF_HOST,
+    CONF_MAX_POWER_LIMIT_W,
+    CONF_PORT,
+    DEFAULT_MAX_POWER_LIMIT_W,
+    DOMAIN,
+)
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -35,7 +43,11 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, tmp_path) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "OCPP (0.0.0.0:9500)"
     assert result["data"] == {CONF_HOST: "0.0.0.0", CONF_PORT: 9500}
-    assert result["options"] == {CONF_AUTHORIZATION_FILE: str(auth_file), CONF_DEFAULT_ID_TAG: "TAG1"}
+    assert result["options"] == {
+        CONF_AUTHORIZATION_FILE: str(auth_file),
+        CONF_DEFAULT_ID_TAG: "TAG1",
+        CONF_MAX_POWER_LIMIT_W: DEFAULT_MAX_POWER_LIMIT_W,
+    }
     assert result["result"].unique_id is not None
 
 

@@ -41,6 +41,11 @@
       "unlock_connector": {
         "default": "mdi:lock-open-variant"
       }
+    },
+    "number": {
+      "power_limit_w": {
+        "default": "mdi:flash"
+      }
     }
   }
 }

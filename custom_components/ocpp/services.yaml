@@ -110,3 +110,36 @@ trigger_message:
             - "Heartbeat"
             - "MeterValues"
             - "StatusNotification"
+
+get_diagnostics:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    location:
+      required: true
+      selector:
+        text:
+    retries:
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+    retry_interval:
+      required: false
+      selector:
+        number:
+          min: 0
+          unit_of_measurement: "s"
+          mode: box
+    start_time:
+      required: false
+      selector:
+        text:
+    stop_time:
+      required: false
+      selector:
+        text:

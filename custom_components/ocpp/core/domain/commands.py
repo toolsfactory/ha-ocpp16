@@ -164,6 +164,17 @@ class TriggerMessageResult:
     status: str  # TriggerMessageStatus: "Accepted" | "Rejected" | "NotImplemented"
 
 
+@dataclass(frozen=True)
+class GetDiagnosticsResult:
+    """Ergebnis von `CommandService.get_diagnostics`.
+
+    OCPP 1.6 definiert für ``GetDiagnostics.conf`` keinen Status -- ``file_name`` ist optional,
+    der Charge Point kennt ihn ggf. noch nicht (siehe ``connection.py``'s Protocol-Docstring).
+    """
+
+    file_name: str | None
+
+
 class CommandService:
     """Central-System-initiierte Aufrufe an einen verbundenen Charge Point."""
 
@@ -275,6 +286,23 @@ class CommandService:
         connection = self._require_connection(charge_point_id)
         status = await connection.trigger_message(requested_message, connector_id)
         return TriggerMessageResult(status=status)
+
+    async def get_diagnostics(
+        self,
+        charge_point_id: str,
+        location: str,
+        *,
+        retries: int | None = None,
+        retry_interval: int | None = None,
+        start_time: str | None = None,
+        stop_time: str | None = None,
+    ) -> GetDiagnosticsResult:
+        """Send GetDiagnostics, asking the charge point to upload a diagnostics file to `location`."""
+        connection = self._require_connection(charge_point_id)
+        file_name = await connection.get_diagnostics(
+            location, retries=retries, retry_interval=retry_interval, start_time=start_time, stop_time=stop_time
+        )
+        return GetDiagnosticsResult(file_name=file_name)
 
     def _require_valid_connector(self, connector_id: int) -> None:
         if connector_id < 1:

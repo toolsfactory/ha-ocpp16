@@ -125,18 +125,28 @@ because 1–6 and 8 do; it should check the bitmask.
 
 ## Services and entities outside this contract
 
-`ocpp.reset`, `ocpp.unlock_connector`, `ocpp.get_configuration`, and `ocpp.change_configuration`
-exist (see the main [README](../../README.md)) but are **not** part of the numbered capability
-contract above — they were added as a separate scope decision (see `DECISIONS.md`) because the
-underlying OCPP calls already existed in `core/`, not because REQ-0035 calls for them. A
-load-management integration can use them, but should not treat their presence as guaranteed the
-way it can for capabilities 1–6 and 8.
+`ocpp.reset`, `ocpp.unlock_connector`, `ocpp.get_configuration`, `ocpp.change_configuration`,
+`ocpp.trigger_message`, and `ocpp.get_diagnostics` exist (see the main
+[README](../../README.md)) but are **not** part of the numbered capability contract above — they
+were added as a separate scope decision (see `DECISIONS.md`) because the underlying OCPP calls
+already existed in `core/`, not because REQ-0035 calls for them. A load-management integration can
+use them, but should not treat their presence as guaranteed the way it can for capabilities 1–6
+and 8. The `button` entities (`button.reset`/`button.unlock_connector`) are dashboard-idiomatic
+wrappers around `ocpp.reset`(`"Soft"`)/`ocpp.unlock_connector` and carry the same status.
 
 The same applies to the `active_phases` sensor (`sensor`, `entity_key="active_phases"`): state is
 the count of currently-active phases (a `Current.Import` sample above zero), with per-phase
 readings (`phase_l1_a`/`phase_l2_a`/`phase_l3_a`) as attributes. It is a convenience entity, not a
 REQ-0035 capability — a load-management integration wanting per-phase current for its own logic
-should read this sensor's attributes directly rather than expecting a bitmask entry for it.
+should read this sensor's attributes directly rather than expecting a bitmask entry for it. The
+same is true of the `last_heartbeat` sensor (no REQ-0035 capability tracks heartbeat timing).
+
+`number.power_limit_w` is UI convenience over Fähigkeit 3/4 (`ocpp.set_power_limit`/
+`ocpp.clear_power_limit`), not a new capability of its own — it calls the same
+`utils/interop.py` functions the services do. Its `native_value` is optimistic (the last
+successfully set/cleared value this session), not a live re-read — a load-management integration
+that needs the charge point's actual current limit should keep using the `effective_power_limit_w`
+sensor (capability 5), not this entity's state.
 
 ## Stability
 

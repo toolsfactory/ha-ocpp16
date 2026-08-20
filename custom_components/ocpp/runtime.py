@@ -26,6 +26,7 @@ class OcppEntryData:
     app: CentralSystemApp
     coordinator: OcppCoordinator
     default_id_tag: str | None
+    max_power_limit_w: float
     entry_id: str
 
 

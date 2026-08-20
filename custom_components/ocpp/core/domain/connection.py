@@ -80,3 +80,15 @@ class ChargePointConnection(Protocol):
     async def trigger_message(self, requested_message: str, connector_id: int | None) -> str:
         """Gibt den ``TriggerMessageStatus``-Wert als String zurück."""
         ...
+
+    async def get_diagnostics(
+        self,
+        location: str,
+        *,
+        retries: int | None,
+        retry_interval: int | None,
+        start_time: str | None,
+        stop_time: str | None,
+    ) -> str | None:
+        """Gibt den vom Charge Point gemeldeten Dateinamen zurück, oder ``None`` (optional laut OCPP 1.6)."""
+        ...

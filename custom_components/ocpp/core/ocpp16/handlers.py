@@ -571,3 +571,26 @@ class ChargePointHandler(OcppChargePoint):
             )
         )
         return str(response.status)
+
+    async def get_diagnostics(
+        self,
+        location: str,
+        *,
+        retries: int | None,
+        retry_interval: int | None,
+        start_time: str | None,
+        stop_time: str | None,
+    ) -> str | None:
+        """Send GetDiagnostics.req and return the reported file name, if any."""
+        response = _expect_response(
+            await self.call(
+                ocpp_call.GetDiagnostics(
+                    location=location,
+                    retries=retries,
+                    retry_interval=retry_interval,
+                    start_time=start_time,
+                    stop_time=stop_time,
+                )
+            )
+        )
+        return response.file_name

@@ -120,6 +120,11 @@ first `BootNotification` — there is nothing to register manually.
 - **Reset (Soft)** (per charge point) — sends a Soft Reset
 - **Unlock** — sends UnlockConnector for this connector
 
+#### Numbers
+
+- **Power Limit** — sets or clears the connector's charging power limit (`0` clears it); its
+  maximum comes from the **Max Power Limit** setup option, not a fixed value
+
 See the [README](../../README.md#available-entities) for full details, and
 [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) if you're building another integration
 against these entities and services.

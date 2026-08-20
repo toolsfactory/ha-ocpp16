@@ -14,6 +14,7 @@ These options are configured during initial setup via the Home Assistant UI.
 | **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                               |
 | **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = reject every idTag |
 | **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start                     |
+| **Max Power Limit**    | number  | No       | `22000`   | Upper bound (watts) for the `number.power_limit_w` entity               |
 
 Host and port are test-bound during setup — a port already in use is rejected immediately with a
 clear error instead of failing later.
@@ -225,6 +226,22 @@ action: ocpp.trigger_message
 data:
   device_id: <charge point device id>
   requested_message: StatusNotification
+```
+
+### `ocpp.get_diagnostics`
+
+Ask the charge point to upload a diagnostics file to a location you provide (an FTP or HTTP(S)
+server you operate). OCPP 1.6 defines no accept/reject status for this call, so a successful call
+always returns `{"file_name": ...}` (`file_name` may be `null` -- the charge point does not have to
+know it yet).
+
+```yaml
+action: ocpp.get_diagnostics
+data:
+  device_id: <charge point device id>
+  location: ftp://ops.example.com/diagnostics/
+  retries: 3
+  retry_interval: 30
 ```
 
 ### Using Services in Automations

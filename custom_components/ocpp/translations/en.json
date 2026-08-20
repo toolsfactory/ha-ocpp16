@@ -8,13 +8,15 @@
           "host": "Host / bind address",
           "port": "Port",
           "authorization_file": "Path to the idTag authorization list (optional)",
-          "default_id_tag": "idTag for remote start (optional)"
+          "default_id_tag": "idTag for remote start (optional)",
+          "max_power_limit_w": "Maximum power limit"
         },
         "data_description": {
           "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
           "port": "Port the OCPP 1.6 WebSocket server listens on for charge points.",
           "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
-          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction.",
+          "max_power_limit_w": "Upper bound (in watts) for the Power Limit number entity -- match your charge point's actual maximum (e.g. 11000 or 22000)."
         }
       },
       "reconfigure": {
@@ -44,11 +46,13 @@
       "init": {
         "data": {
           "authorization_file": "Path to the idTag authorization list (optional)",
-          "default_id_tag": "idTag for remote start (optional)"
+          "default_id_tag": "idTag for remote start (optional)",
+          "max_power_limit_w": "Maximum power limit"
         },
         "data_description": {
           "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
-          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction.",
+          "max_power_limit_w": "Upper bound (in watts) for the Power Limit number entity -- match your charge point's actual maximum (e.g. 11000 or 22000)."
         }
       }
     },
@@ -99,6 +103,11 @@
       },
       "unlock_connector": {
         "name": "Unlock"
+      }
+    },
+    "number": {
+      "power_limit_w": {
+        "name": "Power Limit"
       }
     }
   },
@@ -158,6 +167,17 @@
       "description": "Asks the charging station to resend a specific OCPP message.",
       "fields": {
         "requested_message": { "name": "Message", "description": "Which message the charging station should resend." }
+      }
+    },
+    "get_diagnostics": {
+      "name": "Get diagnostics",
+      "description": "Asks the charging station to upload a diagnostics file to a location you provide.",
+      "fields": {
+        "location": { "name": "Location", "description": "URI the charging station should upload the diagnostics file to (e.g. an FTP or HTTP(S) server)." },
+        "retries": { "name": "Retries", "description": "Optional number of upload retries." },
+        "retry_interval": { "name": "Retry interval", "description": "Optional interval between retries, in seconds." },
+        "start_time": { "name": "Start time", "description": "Optional ISO 8601 timestamp: only include log entries from this time onward." },
+        "stop_time": { "name": "Stop time", "description": "Optional ISO 8601 timestamp: only include log entries up to this time." }
       }
     }
   },

@@ -9,9 +9,11 @@ import voluptuous as vol
 
 from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
 from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
+from custom_components.ocpp.core.domain.commands import ChargePointCallRejectedError
 from custom_components.ocpp.entity_utils.device import charge_point_identifier, connector_identifier
 from custom_components.ocpp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
 from custom_components.ocpp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
+from custom_components.ocpp.service_actions.get_diagnostics import SERVICE_GET_DIAGNOSTICS
 from custom_components.ocpp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
 from custom_components.ocpp.service_actions.reset import SERVICE_RESET
 from custom_components.ocpp.service_actions.trigger_message import SERVICE_TRIGGER_MESSAGE
@@ -230,6 +232,59 @@ async def test_trigger_message_unsupported_message_type_rejected_by_schema(
             DOMAIN,
             SERVICE_TRIGGER_MESSAGE,
             {"device_id": charge_point_device_id, "requested_message": "SignChargePointCertificate"},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_get_diagnostics(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """`get_diagnostics` targets the charge-point device and returns the reported file name."""
+    charge_point_device_id, _ = booted_charge_point
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_GET_DIAGNOSTICS,
+        {"device_id": charge_point_device_id, "location": "ftp://ops.example/diagnostics/"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"file_name": "diagnostics.zip"}
+    mock_charge_point_connection.get_diagnostics.assert_awaited_with(
+        "ftp://ops.example/diagnostics/", retries=None, retry_interval=None, start_time=None, stop_time=None
+    )
+
+
+async def test_get_diagnostics_without_a_reported_file_name(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """OCPP 1.6 defines `file_name` as optional -- `None` is a normal, non-error response."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.get_diagnostics.return_value = None
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_GET_DIAGNOSTICS,
+        {"device_id": charge_point_device_id, "location": "ftp://ops.example/diagnostics/"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"file_name": None}
+
+
+async def test_get_diagnostics_rejected_raises_service_validation_error(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """A `CallError` from the charge point (the only failure path -- OCPP defines no status here) raises."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.get_diagnostics.side_effect = ChargePointCallRejectedError("no handler")
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_DIAGNOSTICS,
+            {"device_id": charge_point_device_id, "location": "ftp://ops.example/diagnostics/"},
             blocking=True,
             return_response=True,
         )
