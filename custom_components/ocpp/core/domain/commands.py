@@ -157,6 +157,13 @@ class ChangeAvailabilityResult:
     status: str  # AvailabilityStatus: "Accepted" | "Rejected" | "Scheduled"
 
 
+@dataclass(frozen=True)
+class TriggerMessageResult:
+    """Ergebnis von `CommandService.trigger_message`."""
+
+    status: str  # TriggerMessageStatus: "Accepted" | "Rejected" | "NotImplemented"
+
+
 class CommandService:
     """Central-System-initiierte Aufrufe an einen verbundenen Charge Point."""
 
@@ -258,6 +265,16 @@ class CommandService:
         connection = self._require_connection(charge_point_id)
         status = await connection.change_availability(connector_id, availability_type)
         return ChangeAvailabilityResult(status=status)
+
+    async def trigger_message(
+        self, charge_point_id: str, requested_message: str, connector_id: int | None = None
+    ) -> TriggerMessageResult:
+        """Send TriggerMessage, optionally scoped to a connector."""
+        if connector_id is not None:
+            self._require_valid_connector(connector_id)
+        connection = self._require_connection(charge_point_id)
+        status = await connection.trigger_message(requested_message, connector_id)
+        return TriggerMessageResult(status=status)
 
     def _require_valid_connector(self, connector_id: int) -> None:
         if connector_id < 1:

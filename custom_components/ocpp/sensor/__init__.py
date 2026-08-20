@@ -16,6 +16,7 @@ from .active_phases import OcppActivePhasesSensor
 from .charge_point_state import OcppChargePointStateSensor
 from .current_power import OcppCurrentPowerSensor
 from .effective_power_limit import OcppEffectivePowerLimitSensor
+from .last_heartbeat import OcppLastHeartbeatSensor
 from .measurand import OcppMeasurandSensor
 
 # Rein lesend -- jede Entity liest bei jedem Dispatcher-Ereignis ihren eigenen
@@ -27,6 +28,7 @@ __all__ = [
     "OcppChargePointStateSensor",
     "OcppCurrentPowerSensor",
     "OcppEffectivePowerLimitSensor",
+    "OcppLastHeartbeatSensor",
     "OcppMeasurandSensor",
     "async_setup_entry",
 ]
@@ -56,6 +58,7 @@ class _SensorManager:
         self.async_add_entities = async_add_entities
         self._known_connectors: set[tuple[str, int]] = set()
         self._known_measurands: set[tuple[str, int, str, str | None]] = set()
+        self._known_charge_points: set[str] = set()
 
     def async_setup(self) -> CALLBACK_TYPE:
         """Start listening and sync already-known charge points. Returns the coordinator unsubscribe callable."""
@@ -85,8 +88,12 @@ class _SensorManager:
             | OcppChargePointStateSensor
             | OcppCurrentPowerSensor
             | OcppEffectivePowerLimitSensor
+            | OcppLastHeartbeatSensor
             | OcppMeasurandSensor
         ] = []
+        if charge_point_id not in self._known_charge_points:
+            self._known_charge_points.add(charge_point_id)
+            new_entities.append(OcppLastHeartbeatSensor(self.coordinator, self.entry_data, charge_point_id))
         for connector_id in connector_ids:
             if connector_id < 1:
                 continue  # ADR-0008: connectorId 0 hat kein eigenes Sub-Device.

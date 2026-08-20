@@ -1,5 +1,5 @@
 """Gemeinsame Entity-Basisklassen-Paket."""
 
-from .base import OcppConnectorEntity
+from .base import OcppChargePointEntity, OcppConnectorEntity
 
-__all__ = ["OcppConnectorEntity"]
+__all__ = ["OcppChargePointEntity", "OcppConnectorEntity"]

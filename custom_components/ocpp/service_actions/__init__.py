@@ -48,6 +48,7 @@ from .power_limit import (
     _handle_set_power_limit,
 )
 from .reset import _RESET_SCHEMA, SERVICE_RESET, _handle_reset
+from .trigger_message import _TRIGGER_MESSAGE_SCHEMA, SERVICE_TRIGGER_MESSAGE, _handle_trigger_message
 from .unlock_connector import _UNLOCK_CONNECTOR_SCHEMA, SERVICE_UNLOCK_CONNECTOR, _handle_unlock_connector
 
 __all__ = ["async_register_services"]
@@ -62,6 +63,7 @@ _SERVICES: tuple[tuple[str, vol.Schema, _ServiceHandler], ...] = (
     (SERVICE_UNLOCK_CONNECTOR, _UNLOCK_CONNECTOR_SCHEMA, _handle_unlock_connector),
     (SERVICE_GET_CONFIGURATION, _GET_CONFIGURATION_SCHEMA, _handle_get_configuration),
     (SERVICE_CHANGE_CONFIGURATION, _CHANGE_CONFIGURATION_SCHEMA, _handle_change_configuration),
+    (SERVICE_TRIGGER_MESSAGE, _TRIGGER_MESSAGE_SCHEMA, _handle_trigger_message),
 )
 
 

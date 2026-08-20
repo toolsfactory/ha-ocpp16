@@ -80,6 +80,9 @@
       },
       "measurand": {
         "name": "{measurand_name}"
+      },
+      "last_heartbeat": {
+        "name": "Last Heartbeat"
       }
     },
     "switch": {
@@ -88,6 +91,14 @@
       },
       "availability": {
         "name": "Availability"
+      }
+    },
+    "button": {
+      "reset": {
+        "name": "Reset (Soft)"
+      },
+      "unlock_connector": {
+        "name": "Unlock"
       }
     }
   },
@@ -140,6 +151,13 @@
       "fields": {
         "key": { "name": "Key", "description": "Name of the configuration key." },
         "value": { "name": "Value", "description": "New value for the configuration key." }
+      }
+    },
+    "trigger_message": {
+      "name": "Trigger message",
+      "description": "Asks the charging station to resend a specific OCPP message.",
+      "fields": {
+        "requested_message": { "name": "Message", "description": "Which message the charging station should resend." }
       }
     }
   },

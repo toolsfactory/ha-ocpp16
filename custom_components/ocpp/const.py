@@ -6,7 +6,7 @@ Bewusst getrennt vom Standalone-Kern (``src/ocpp/``) gehalten -- keine
 
 DOMAIN = "ocpp"
 
-PLATFORMS = ["sensor", "switch"]
+PLATFORMS = ["sensor", "switch", "button"]
 
 # -- Config-Flow-Felder (REQ-0016, ADR-0008 Abschnitt 4) --------------------
 CONF_HOST = "host"

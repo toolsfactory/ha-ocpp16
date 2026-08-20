@@ -1,10 +1,11 @@
-"""Tests for the 7 OCPP services in `service_actions/`."""
+"""Tests for the 8 OCPP services in `service_actions/`."""
 
 from collections.abc import Callable
 from unittest.mock import AsyncMock
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
 from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
@@ -13,6 +14,7 @@ from custom_components.ocpp.service_actions.authorize_id_token import SERVICE_AU
 from custom_components.ocpp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
 from custom_components.ocpp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
 from custom_components.ocpp.service_actions.reset import SERVICE_RESET
+from custom_components.ocpp.service_actions.trigger_message import SERVICE_TRIGGER_MESSAGE
 from custom_components.ocpp.service_actions.unlock_connector import SERVICE_UNLOCK_CONNECTOR
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -181,6 +183,56 @@ async def test_get_and_change_configuration(
         return_response=True,
     )
     assert response == {"status": "Accepted"}
+
+
+async def test_trigger_message(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """`trigger_message` targets the charge-point device and returns the status as data."""
+    charge_point_device_id, _ = booted_charge_point
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_TRIGGER_MESSAGE,
+        {"device_id": charge_point_device_id, "requested_message": "StatusNotification"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"status": "Accepted"}
+    mock_charge_point_connection.trigger_message.assert_awaited_with("StatusNotification", None)
+
+
+async def test_trigger_message_rejected_does_not_raise(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str], mock_charge_point_connection
+) -> None:
+    """Unlike `reset`/`unlock_connector`, a non-`Accepted` status is informative data, not a failure (see plan)."""
+    charge_point_device_id, _ = booted_charge_point
+    mock_charge_point_connection.trigger_message.return_value = "NotImplemented"
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_TRIGGER_MESSAGE,
+        {"device_id": charge_point_device_id, "requested_message": "DiagnosticsStatusNotification"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"status": "NotImplemented"}
+
+
+async def test_trigger_message_unsupported_message_type_rejected_by_schema(
+    hass: HomeAssistant, booted_charge_point: tuple[str, str]
+) -> None:
+    """The Security Whitepaper extensions (`SignChargePointCertificate` etc.) are out of scope, see plan."""
+    charge_point_device_id, _ = booted_charge_point
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_TRIGGER_MESSAGE,
+            {"device_id": charge_point_device_id, "requested_message": "SignChargePointCertificate"},
+            blocking=True,
+            return_response=True,
+        )
 
 
 async def test_reset_rejected_raises_service_validation_error(

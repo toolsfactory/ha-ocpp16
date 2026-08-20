@@ -20,6 +20,7 @@ class _ChargePointRecord:
     charge_point_id: str
     connection_status: ConnectionStatus
     last_boot_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
     vendor: str | None = None
     model: str | None = None
     firmware_version: str | None = None
@@ -29,6 +30,7 @@ class _ChargePointRecord:
             charge_point_id=self.charge_point_id,
             connection_status=self.connection_status,
             last_boot_at=self.last_boot_at,
+            last_heartbeat_at=self.last_heartbeat_at,
             vendor=self.vendor,
             model=self.model,
             firmware_version=self.firmware_version,
@@ -86,6 +88,17 @@ class ChargePointRegistryStore:
         record.model = model
         record.firmware_version = firmware_version
         record.last_boot_at = boot_at
+
+    def mark_heartbeat(self, charge_point_id: str, at: datetime) -> None:
+        """Record a Heartbeat. No-op if the charge point isn't registered yet.
+
+        A connection is always registered (``register_connection``) before any OCPP message,
+        including the first ``Heartbeat``, can arrive -- this mirrors ``mark_disconnected``'s
+        existing defensive style rather than assuming that invariant can never be violated.
+        """
+        record = self._records.get(charge_point_id)
+        if record is not None:
+            record.last_heartbeat_at = at
 
     def mark_disconnected(self, charge_point_id: str, handler: ChargePointConnection) -> None:
         """Markiert offline, aber nur wenn ``handler`` noch aktuell ist.

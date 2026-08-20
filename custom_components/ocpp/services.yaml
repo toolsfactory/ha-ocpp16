@@ -91,3 +91,22 @@ change_configuration:
       required: true
       selector:
         text:
+
+trigger_message:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    requested_message:
+      required: true
+      selector:
+        select:
+          options:
+            - "BootNotification"
+            - "DiagnosticsStatusNotification"
+            - "FirmwareStatusNotification"
+            - "Heartbeat"
+            - "MeterValues"
+            - "StatusNotification"

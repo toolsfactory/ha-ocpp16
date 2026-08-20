@@ -253,8 +253,11 @@ class ChargePointHandler(OcppChargePoint):
     @on(ocpp_enums.Action.heartbeat)
     @_log_handler_errors
     async def on_heartbeat(self, **kwargs: object) -> ocpp_call_result.Heartbeat:
-        """Handle Heartbeat.req: reply with the current server time."""
-        return ocpp_call_result.Heartbeat(current_time=_to_iso(_utcnow()))
+        """Handle Heartbeat.req: record it, reply with the current server time."""
+        now = _utcnow()
+        self._services.registry.mark_heartbeat(self.id, now)
+        self._services.events.publish(StateChangeEvent(self.id, None, None))
+        return ocpp_call_result.Heartbeat(current_time=_to_iso(now))
 
     @on(ocpp_enums.Action.status_notification)
     @_log_handler_errors
@@ -553,6 +556,17 @@ class ChargePointHandler(OcppChargePoint):
             await self.call(
                 ocpp_call.ChangeAvailability(
                     connector_id=connector_id, type=ocpp_enums.AvailabilityType(availability_type)
+                )
+            )
+        )
+        return str(response.status)
+
+    async def trigger_message(self, requested_message: str, connector_id: int | None) -> str:
+        """Send TriggerMessage.req and return its status."""
+        response = _expect_response(
+            await self.call(
+                ocpp_call.TriggerMessage(
+                    requested_message=ocpp_enums.MessageTrigger(requested_message), connector_id=connector_id
                 )
             )
         )

@@ -37,6 +37,7 @@ class ChargePointSnapshot:
     charge_point_id: str
     connection_status: ConnectionStatus
     last_boot_at: datetime | None
+    last_heartbeat_at: datetime | None
     vendor: str | None
     model: str | None
     firmware_version: str | None

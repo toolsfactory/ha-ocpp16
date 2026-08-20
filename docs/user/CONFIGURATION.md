@@ -212,6 +212,21 @@ data:
   value: "300"
 ```
 
+### `ocpp.trigger_message`
+
+Ask the charge point to resend a specific OCPP message (`BootNotification`,
+`DiagnosticsStatusNotification`, `FirmwareStatusNotification`, `Heartbeat`, `MeterValues`, or
+`StatusNotification`). Unlike the services above, a non-`Accepted` status is returned as response
+data rather than raised as an error — it doesn't change any charge-point state, so it's informative
+rather than a failure.
+
+```yaml
+action: ocpp.trigger_message
+data:
+  device_id: <charge point device id>
+  requested_message: StatusNotification
+```
+
 ### Using Services in Automations
 
 ```yaml

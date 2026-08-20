@@ -96,7 +96,7 @@ first `BootNotification` — there is nothing to register manually.
   "Ladepunkt `<connectorId>`". `connectorId 0` (the charge point as a whole, per OCPP 1.6) never
   gets its own device or entities.
 
-### Entities (per connector)
+### Entities (per connector, unless noted otherwise)
 
 #### Sensors
 
@@ -108,11 +108,17 @@ first `BootNotification` — there is nothing to register manually.
   as attributes
 - **Measurand sensors** — one dynamic sensor per measurand the charge point actually reports
   (energy, voltage, current, temperature, state of charge, ...)
+- **Last Heartbeat** (per charge point) — timestamp of the charge point's most recent heartbeat
 
 #### Switches
 
 - **Start/Stop** — remote-starts or stops a transaction
 - **Availability** — takes the connector operative or inoperative
+
+#### Buttons
+
+- **Reset (Soft)** (per charge point) — sends a Soft Reset
+- **Unlock** — sends UnlockConnector for this connector
 
 See the [README](../../README.md#available-entities) for full details, and
 [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) if you're building another integration

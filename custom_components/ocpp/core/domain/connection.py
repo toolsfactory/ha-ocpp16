@@ -76,3 +76,7 @@ class ChargePointConnection(Protocol):
     async def change_availability(self, connector_id: int, availability_type: str) -> str:
         """Gibt den ``AvailabilityStatus``-Wert als String zurück (ADR-0009)."""
         ...
+
+    async def trigger_message(self, requested_message: str, connector_id: int | None) -> str:
+        """Gibt den ``TriggerMessageStatus``-Wert als String zurück."""
+        ...

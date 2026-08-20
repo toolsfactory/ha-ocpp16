@@ -109,8 +109,9 @@ Services** → **OCPP 1.6 Central System**.
 
 ## Available Entities
 
-Entities are created per connector as soon as a charge point reports it (connector 0, the charge
-point as a whole, never gets its own entities).
+Most entities are created per connector as soon as a charge point reports it (connector 0, the
+charge point as a whole, never gets its own connector entities). A few are charge-point-wide
+instead, noted below.
 
 ### Sensors
 
@@ -126,6 +127,8 @@ point as a whole, never gets its own entities).
 - **Measurand sensors**: One dynamic sensor per measurand a charge point actually reports (energy,
   voltage, current, temperature, state of charge, ...), split by phase where the charge point
   reports one
+- **Last Heartbeat** (charge-point-wide): Timestamp of the charge point's most recent OCPP
+  `Heartbeat.req`
 
 ### Switches
 
@@ -133,6 +136,12 @@ point as a whole, never gets its own entities).
   connector's active transaction
 - **Availability**: Sets the connector operative or inoperative. A pending ("Scheduled") change is
   not reflected until the charge point confirms it with a status update
+
+### Buttons
+
+- **Reset (Soft)** (charge-point-wide): Sends a Soft Reset. For a Hard reset, use the
+  `ocpp.reset` service instead
+- **Unlock**: Sends UnlockConnector for this connector
 
 ## Custom Services
 
@@ -223,6 +232,20 @@ data:
   device_id: <charge point device id>
   key: HeartbeatInterval
   value: "300"
+```
+
+### `ocpp.trigger_message`
+
+Ask the charge point to resend a specific OCPP message. Unlike the other services above, a
+non-`Accepted` status (`Rejected`/`NotImplemented`) is returned as normal response data rather than
+raising an error — it doesn't change any charge-point state, so it's informative ("doesn't support
+that message"), not a failure.
+
+```yaml
+service: ocpp.trigger_message
+data:
+  device_id: <charge point device id>
+  requested_message: StatusNotification
 ```
 
 ## Configuration Options
