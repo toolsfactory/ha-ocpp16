@@ -1,4 +1,4 @@
-"""Tests for `OccpStartStopSwitch` (REQ-0020)."""
+"""Tests for `OcppStartStopSwitch` (REQ-0020)."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.occp.entity_utils.device import connector_identifier
+from custom_components.ocpp.const import CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -20,7 +20,7 @@ def mock_config_entry() -> MockConfigEntry:
     """A config entry with a default idTag configured, needed for `async_turn_on`."""
     return MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9000)",
+        title="OCPP (0.0.0.0:9000)",
         unique_id="0.0.0.0:9000",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9000},
         options={CONF_DEFAULT_ID_TAG: "TAG1"},
@@ -63,7 +63,7 @@ async def test_turn_on_without_default_id_tag_raises(
     """No configured default idTag is a clear configuration error, not a silent no-op (REQ-0020)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9000)",
+        title="OCPP (0.0.0.0:9000)",
         unique_id="0.0.0.0:9000",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9000},
     )

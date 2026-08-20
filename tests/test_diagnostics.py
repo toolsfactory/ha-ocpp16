@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.occp.diagnostics import async_get_config_entry_diagnostics
+from custom_components.ocpp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp.diagnostics import async_get_config_entry_diagnostics
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 
@@ -25,7 +25,7 @@ async def test_diagnostics_redacts_sensitive_fields(
 
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9500)",
+        title="OCPP (0.0.0.0:9500)",
         unique_id="existing-uuid",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
         options={CONF_AUTHORIZATION_FILE: str(auth_file), CONF_DEFAULT_ID_TAG: "SECRET-TAG"},

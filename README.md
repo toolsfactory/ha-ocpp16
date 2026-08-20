@@ -1,4 +1,4 @@
-# OCCP - OCPP 1.6 Central System
+# OCPP 1.6 Central System
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -9,11 +9,11 @@
 
 **✨ Develop in the cloud:** Want to contribute or customize this integration? Open it directly in GitHub Codespaces - no local setup required!
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/toolsfactory/occp-ha?quickstart=1)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/toolsfactory/ocpp-ha?quickstart=1)
 
 ## ✨ Features
 
-OCCP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server that
+OCPP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server that
 charge points connect to, rather than polling a cloud API.
 
 - **Easy Setup**: Configure the listen address/port through the UI - no YAML required
@@ -49,7 +49,7 @@ Each charge point becomes a Home Assistant device, with every connector as its o
 
 Click the button below to open the integration directly in HACS:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=toolsfactory&repository=occp-ha&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=toolsfactory&repository=ocpp-ha&category=integration)
 
 Then:
 
@@ -64,7 +64,7 @@ Then:
 
 If you prefer not to use HACS:
 
-1. Download the `custom_components/occp/` folder from this repository
+1. Download the `custom_components/ocpp/` folder from this repository
 2. Copy it to your Home Assistant's `custom_components/` directory
 3. Restart Home Assistant
 
@@ -78,7 +78,7 @@ If you prefer not to use HACS:
 
 Click the button below to open the configuration dialog:
 
-[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=occp)
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=ocpp)
 
 Follow the setup wizard:
 
@@ -95,7 +95,7 @@ backend URL at `ws://<this host>:<port>/<chargePointId>`.
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **"+ Add Integration"**
-3. Search for "OCCP - OCPP 1.6 Central System"
+3. Search for "OCPP 1.6 Central System"
 4. Follow the same setup steps as Option 1
 
 You can add more than one config entry (e.g. one listen port per site) - each runs its own
@@ -105,7 +105,7 @@ independent WebSocket server.
 
 Devices and entities appear automatically the moment a charge point connects and sends its first
 `BootNotification` - there is nothing to register manually. Find them in **Settings** → **Devices &
-Services** → **OCCP - OCPP 1.6 Central System**.
+Services** → **OCPP 1.6 Central System**.
 
 ## Available Entities
 
@@ -143,34 +143,34 @@ separate load-management integration to build against — see
 four services below it (`reset`, `unlock_connector`, `get_configuration`, `change_configuration`)
 are useful operational actions but are not part of that contract.
 
-### `occp.set_power_limit`
+### `ocpp.set_power_limit`
 
 Set a connector's charging power limit.
 
 ```yaml
-service: occp.set_power_limit
+service: ocpp.set_power_limit
 data:
   device_id: <connector device id>
   limit_w: 7400
   phases: 3 # optional
 ```
 
-### `occp.clear_power_limit`
+### `ocpp.clear_power_limit`
 
 Remove a connector's charging power limit.
 
 ```yaml
-service: occp.clear_power_limit
+service: ocpp.clear_power_limit
 data:
   device_id: <connector device id>
 ```
 
-### `occp.authorize_id_token`
+### `ocpp.authorize_id_token`
 
 Check whether an idTag is authorized, without starting a transaction.
 
 ```yaml
-service: occp.authorize_id_token
+service: ocpp.authorize_id_token
 data:
   charge_point_id: CP001
   id_token: TAG001
@@ -178,47 +178,47 @@ data:
 
 `charge_point_id` alone is ambiguous if two loaded instances happen to see the same OCPP
 `chargePointId`. Add an optional `device_id` (the charge point's or a connector's device) to
-resolve it unambiguously — see [`CONFIGURATION.md`](docs/user/CONFIGURATION.md#occpauthorize_id_token)
+resolve it unambiguously — see [`CONFIGURATION.md`](docs/user/CONFIGURATION.md#ocppauthorize_id_token)
 for details.
 
-### `occp.reset`
+### `ocpp.reset`
 
 Soft- or hard-reset the charge point (targets the charge-point device itself, not a connector).
 
 ```yaml
-service: occp.reset
+service: ocpp.reset
 data:
   device_id: <charge point device id>
   reset_type: Soft # or Hard
 ```
 
-### `occp.unlock_connector`
+### `ocpp.unlock_connector`
 
 Ask the charge point to unlock a connector.
 
 ```yaml
-service: occp.unlock_connector
+service: ocpp.unlock_connector
 data:
   device_id: <connector device id>
 ```
 
-### `occp.get_configuration`
+### `ocpp.get_configuration`
 
 Read one or more OCPP configuration keys from the charge point (all of them if `keys` is omitted).
 
 ```yaml
-service: occp.get_configuration
+service: ocpp.get_configuration
 data:
   device_id: <charge point device id>
   keys: [HeartbeatInterval] # optional
 ```
 
-### `occp.change_configuration`
+### `ocpp.change_configuration`
 
 Set a single OCPP configuration key on the charge point.
 
 ```yaml
-service: occp.change_configuration
+service: ocpp.change_configuration
 data:
   device_id: <charge point device id>
   key: HeartbeatInterval
@@ -238,7 +238,7 @@ data:
 
 Host and port are fixed once the entry is created (changing the listen address needs a new entry).
 Authorization File and Default idTag can be changed afterwards via **Settings** → **Devices &
-Services** → **OCCP** → **Configure** — this reloads the entry to apply the change.
+Services** → **OCPP** → **Configure** — this reloads the entry to apply the change.
 
 ## Troubleshooting
 
@@ -257,7 +257,7 @@ To enable debug logging for this integration, add the following to your `configu
 logger:
   default: info
   logs:
-    custom_components.occp: debug
+    custom_components.ocpp: debug
 ```
 
 ## 🤝 Contributing
@@ -380,12 +380,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/toolsfactory/occp-ha.svg?style=for-the-badge
-[commits]: https://github.com/toolsfactory/occp-ha/commits/main
+[commits-shield]: https://img.shields.io/github/commit-activity/y/toolsfactory/ocpp-ha.svg?style=for-the-badge
+[commits]: https://github.com/toolsfactory/ocpp-ha/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge
-[license-shield]: https://img.shields.io/github/license/toolsfactory/occp-ha.svg?style=for-the-badge
+[license-shield]: https://img.shields.io/github/license/toolsfactory/ocpp-ha.svg?style=for-the-badge
 [maintenance-shield]: https://img.shields.io/badge/maintainer-%40toolsfactory-blue.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/toolsfactory/occp-ha.svg?style=for-the-badge
-[releases]: https://github.com/toolsfactory/occp-ha/releases
+[releases-shield]: https://img.shields.io/github/release/toolsfactory/ocpp-ha.svg?style=for-the-badge
+[releases]: https://github.com/toolsfactory/ocpp-ha/releases
 [user_profile]: https://github.com/toolsfactory

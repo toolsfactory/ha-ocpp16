@@ -1,6 +1,6 @@
 # Configuration Reference
 
-This document describes all configuration options and settings available in the OCCP - OCPP 1.6 Central System custom integration.
+This document describes all configuration options and settings available in the OCPP 1.6 Central System custom integration.
 
 ## Integration Configuration
 
@@ -33,12 +33,12 @@ Every field except the key itself is optional. `blocked: true` rejects the tag o
 `expiryDate` (ISO 8601) rejects it once past.
 
 **Leaving the authorization file unset does not accept every idTag — it rejects every idTag.**
-With no file configured, OCCP's authorization provider has an empty allow-list, so
+With no file configured, OCPP's authorization provider has an empty allow-list, so
 `authorize_id_token` and every `RemoteStartTransaction`/`StartTransaction` idTag check comes back
 `Invalid` (`core/domain/authorization.py`'s `StaticAuthorizationProvider.authorize()` returns
 `Invalid` for any tag not found in its entries — an empty provider has none). Set an authorization
 file listing at least the `Default idTag` if you want the `start_stop` switch or
-`occp.authorize_id_token` to work at all.
+`ocpp.authorize_id_token` to work at all.
 
 ### Options Flow
 
@@ -46,7 +46,7 @@ The **Authorization File** and **Default idTag** can be changed after setup, wit
 the integration — the entry reloads automatically to apply the change:
 
 1. Go to **Settings** → **Devices & Services**
-2. Find "OCCP - OCPP 1.6 Central System"
+2. Find "OCPP 1.6 Central System"
 3. Click **Configure**
 4. Modify the authorization file path or default idTag
 5. Click **Submit**
@@ -60,7 +60,7 @@ The **Host** and **Port** can also be changed after setup, without deleting and 
 entry (and losing its devices/entities/history):
 
 1. Go to **Settings** → **Devices & Services**
-2. Find the specific "OCCP (host:port)" entry you want to change
+2. Find the specific "OCPP (host:port)" entry you want to change
 3. Open its menu (⋮) and select **Reconfigure**
 4. Enter the new host/port — the same port-in-use check from initial setup applies
 5. Click **Submit** — the entry reloads on the new address automatically
@@ -113,7 +113,7 @@ or the device selector Home Assistant's service UI offers for these fields autom
 [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) for the full machine-readable contract
 if you're building another integration against these.
 
-### `occp.set_power_limit`
+### `ocpp.set_power_limit`
 
 Set a connector's charging power limit.
 
@@ -124,88 +124,88 @@ Set a connector's charging power limit.
 | `phases`    | No       | Number of phases (1–3)     |
 
 ```yaml
-action: occp.set_power_limit
+action: ocpp.set_power_limit
 data:
   device_id: <connector device id>
   limit_w: 7400
   phases: 3
 ```
 
-### `occp.clear_power_limit`
+### `ocpp.clear_power_limit`
 
 Remove a connector's charging power limit.
 
 ```yaml
-action: occp.clear_power_limit
+action: ocpp.clear_power_limit
 data:
   device_id: <connector device id>
 ```
 
-### `occp.authorize_id_token`
+### `ocpp.authorize_id_token`
 
 Check whether an idTag is authorized, without starting a transaction.
 
 ```yaml
-action: occp.authorize_id_token
+action: ocpp.authorize_id_token
 data:
   charge_point_id: CP001
   id_token: TAG001
 ```
 
-`charge_point_id` alone is ambiguous the moment two loaded OCCP instances happen to see the same
+`charge_point_id` alone is ambiguous the moment two loaded OCPP instances happen to see the same
 OCPP `chargePointId` — the call is answered by whichever instance's registry is scanned first,
 which is not guaranteed to be the one you meant. Add `device_id` (the charge point's or a
 connector's device) to resolve it unambiguously instead:
 
 ```yaml
-action: occp.authorize_id_token
+action: ocpp.authorize_id_token
 data:
   charge_point_id: CP001
   id_token: TAG001
   device_id: <charge point or connector device id>
 ```
 
-If you only ever run a single OCCP instance, or are certain no two instances share a
+If you only ever run a single OCPP instance, or are certain no two instances share a
 `chargePointId`, omitting `device_id` is fine — it exists specifically for the multi-instance case.
 
-### `occp.reset`
+### `ocpp.reset`
 
 Soft- or hard-reset the charge point.
 
 ```yaml
-action: occp.reset
+action: ocpp.reset
 data:
   device_id: <charge point device id>
   reset_type: Soft
 ```
 
-### `occp.unlock_connector`
+### `ocpp.unlock_connector`
 
 Ask the charge point to unlock a connector.
 
 ```yaml
-action: occp.unlock_connector
+action: ocpp.unlock_connector
 data:
   device_id: <connector device id>
 ```
 
-### `occp.get_configuration`
+### `ocpp.get_configuration`
 
 Read one or more OCPP configuration keys (all of them if `keys` is omitted).
 
 ```yaml
-action: occp.get_configuration
+action: ocpp.get_configuration
 data:
   device_id: <charge point device id>
   keys: [HeartbeatInterval]
 ```
 
-### `occp.change_configuration`
+### `ocpp.change_configuration`
 
 Set a single OCPP configuration key.
 
 ```yaml
-action: occp.change_configuration
+action: ocpp.change_configuration
 data:
   device_id: <charge point device id>
   key: HeartbeatInterval
@@ -221,7 +221,7 @@ automation:
       - trigger: time
         at: "22:00:00"
     action:
-      - action: occp.set_power_limit
+      - action: ocpp.set_power_limit
         data:
           device_id: <connector device id>
           limit_w: 3700
@@ -237,7 +237,7 @@ segment:
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
-3. Search for "OCCP - OCPP 1.6 Central System"
+3. Search for "OCPP 1.6 Central System"
 4. Configure with a different host/port
 
 Each instance's devices/entities are entirely independent.
@@ -249,12 +249,12 @@ Charge points connect _to_ Home Assistant, not the other way around:
 - Ensure the configured port is reachable from the charge point (open the port on Home Assistant's
   host firewall, forward it if the charge point is on a different network)
 - The charge point must be configured with `ws://<home-assistant-host>:<port>/<chargePointId>` and
-  subprotocol `ocpp1.6` — OCCP does not support `wss://` directly (put a reverse proxy in front if
+  subprotocol `ocpp1.6` — OCPP does not support `wss://` directly (put a reverse proxy in front if
   the charge point requires TLS)
 
 ### Push Behavior
 
-OCCP does **not** poll — `iot_class: local_push`. Entities update the moment a charge point sends
+OCPP does **not** poll — `iot_class: local_push`. Entities update the moment a charge point sends
 a relevant OCPP message (`StatusNotification`, `MeterValues`, ...); there is no update interval to
 configure and nothing to tune for responsiveness.
 
@@ -272,7 +272,7 @@ The integration works with Home Assistant Blueprints for reusable automations:
 
 ```yaml
 blueprint:
-  name: OCCP Connector Error Alert
+  name: OCPP Connector Error Alert
   description: Notify when a connector's state becomes "error".
   domain: automation
   input:
@@ -281,7 +281,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: occp
+          integration: ocpp
     notify_target:
       name: Notification service
       default: notify.notify
@@ -328,5 +328,5 @@ If configuration changes aren't persisted:
 
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
 - [Examples](./EXAMPLES.md) - Automation and dashboard examples
-- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCCP
-- [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues) - Report problems
+- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
+- [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues) - Report problems

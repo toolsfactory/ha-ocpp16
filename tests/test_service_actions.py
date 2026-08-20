@@ -1,4 +1,4 @@
-"""Tests for the 7 OCCP services in `service_actions/`."""
+"""Tests for the 7 OCPP services in `service_actions/`."""
 
 from collections.abc import Callable
 from unittest.mock import AsyncMock
@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.occp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
-from custom_components.occp.entity_utils.device import charge_point_identifier, connector_identifier
-from custom_components.occp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
-from custom_components.occp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
-from custom_components.occp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
-from custom_components.occp.service_actions.reset import SERVICE_RESET
-from custom_components.occp.service_actions.unlock_connector import SERVICE_UNLOCK_CONNECTOR
+from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
+from custom_components.ocpp.entity_utils.device import charge_point_identifier, connector_identifier
+from custom_components.ocpp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
+from custom_components.ocpp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
+from custom_components.ocpp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
+from custom_components.ocpp.service_actions.reset import SERVICE_RESET
+from custom_components.ocpp.service_actions.unlock_connector import SERVICE_UNLOCK_CONNECTOR
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
@@ -309,7 +309,7 @@ async def test_service_call_reaches_the_device_s_own_entry_not_the_first_loaded_
 
     second_entry = MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9500)",
+        title="OCPP (0.0.0.0:9500)",
         unique_id="second-entry-uuid",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
     )
@@ -362,7 +362,7 @@ async def test_authorize_id_token_with_device_id_scopes_to_the_correct_entry(
 
     second_entry = MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9500)",
+        title="OCPP (0.0.0.0:9500)",
         unique_id="second-entry-uuid",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
     )

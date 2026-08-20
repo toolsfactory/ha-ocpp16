@@ -53,11 +53,19 @@ run_hook "develop" "pre"
 # script/hooks/develop.pre.sh. Never fatal — Home Assistant must still start.
 "$SCRIPT_DIR/setup/seed-auth" || log_warning "Continuing without a development token"
 
-# Set the path to custom_components
-## This let's us have the structure we want <root>/custom_components/<domain>
-## while at the same time have Home Assistant configuration inside <root>/config
-## without resulting to symlinks.
-export PYTHONPATH="${PYTHONPATH:-}:${PWD}/custom_components"
+# Put the repo root itself on PYTHONPATH so `custom_components.<domain>` resolves as a
+## namespace package. This lets us have the structure we want <root>/custom_components/<domain>
+## while at the same time have Home Assistant configuration inside <root>/config without
+## resorting to symlinks.
+##
+## Deliberately the repo root, not "${PWD}/custom_components" -- adding the custom_components
+## directory itself would make every integration folder inside it (this one, and any other
+## custom_components/<name>/) directly importable as a bare top-level package by that same
+## name. That is silently harmless right up until an integration's domain collides with an
+## actual PyPI dependency's import name -- which "ocpp" (the domain) now does with the `ocpp`
+## library this integration depends on, causing Python to load the same code under two
+## unrelated module identities and fail with a spurious "circular import" error.
+export PYTHONPATH="${PYTHONPATH:-}:${PWD}"
 
 log_header "Starting Home Assistant in development mode"
 log_info "Config directory: ${PWD}/config"

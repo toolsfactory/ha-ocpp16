@@ -24,16 +24,16 @@ Each decision is documented with:
 
 **Date:** 2026-08-18
 
-**Context:** OCCP's standalone core (`core/`) already has its own push-based, poll-free domain
+**Context:** OCPP's standalone core (`core/`) already has its own push-based, poll-free domain
 model — `QueryService`/`CommandService` are free, always-current in-memory reads with no I/O.
 `AGENTS.md`'s Home Assistant rule ("entities read `coordinator.data`, never reach past it") is
 written for the common case where the coordinator's fetch _is_ the expensive operation worth
 sharing across entities. Here it is not: there is nothing to fetch, and nothing to poll
 (`iot_class: local_push`).
 
-**Decision:** `OccpCoordinator(DataUpdateCoordinator[StateChangeEvent | None])`,
+**Decision:** `OcppCoordinator(DataUpdateCoordinator[StateChangeEvent | None])`,
 `update_interval=None`. The coordinator holds only the most recently published `StateChangeEvent`,
-not a materialized copy of any domain state. Entities extend `CoordinatorEntity[OccpCoordinator]`
+not a materialized copy of any domain state. Entities extend `CoordinatorEntity[OcppCoordinator]`
 for lifecycle/`available` plumbing and re-render triggers, but read `QueryService`/
 `CommandService` directly in their property getters — exactly as they would without a coordinator
 at all.
@@ -43,7 +43,7 @@ at all.
 - Materializing a second `.data` snapshot from `QueryService` would just be a synchronization
   liability (two copies of the same state, no benefit) with no read ever actually reading it.
 - The event still buys the one thing a coordinator is for here: entities that only care about
-  their own connector (e.g. `OccpEffectivePowerLimitSensor`) can filter by `event.connector_id`
+  their own connector (e.g. `OcppEffectivePowerLimitSensor`) can filter by `event.connector_id`
   before doing an OCPP round trip (`GetCompositeSchedule`), instead of refreshing on every event
   for every connector.
 - Confirmed explicitly with the maintainer as a deliberate, narrower reading of the "coordinator
@@ -65,7 +65,7 @@ at all.
 
 **Date:** 2026-08-18
 
-**Context:** `__init__.py` originally constructed `OccpCoordinator` (which subscribes on
+**Context:** `__init__.py` originally constructed `OcppCoordinator` (which subscribes on
 `app.query_service`) before subscribing its own charge-point device-registration listener.
 `EventBus.publish()` calls listeners in subscription order, and
 `DataUpdateCoordinator.async_set_updated_data()` triggers the coordinator's _own_ listeners
@@ -77,7 +77,7 @@ unnoticed through several rounds of `--level error`-only log checks until a coor
 test caught it directly.
 
 **Decision:** Subscribe the device-registration listener on `app.query_service` before
-constructing `OccpCoordinator` in `async_setup_entry()`.
+constructing `OcppCoordinator` in `async_setup_entry()`.
 
 **Rationale:** Subscription order is the only lever available — `EventBus` has no priority
 concept, and adding one for a single ordering dependency would be over-engineering for a
@@ -118,7 +118,7 @@ changed without disruption; the authorization file path and default idTag are op
 settings a user may reasonably want to change without recreating the entry.
 
 **Decision:** `host`/`port` live in `entry.data`. `authorization_file`/`default_id_tag` live in
-`entry.options`, editable via `OccpOptionsFlow` without removing the entry. Changing them fires an
+`entry.options`, editable via `OcppOptionsFlow` without removing the entry. Changing them fires an
 options-update listener that reloads the entry (`CentralSystemApp` builds both from the loaded
 config once, at setup).
 
@@ -162,19 +162,19 @@ misrouting the call.
 by an `EntityDescription.value_fn` per logical group, with per-group files holding descriptions
 only (see `ha-entity-platform`).
 
-**Decision:** Each OCCP entity (`OccpChargePointStateSensor`, `OccpCurrentPowerSensor`,
-`OccpEffectivePowerLimitSensor`, `OccpMeasurandSensor`, and the two switches) is its own class with
-its own `native_value`/`is_on` logic, sharing only `OccpConnectorEntity` (device info, unique ID,
+**Decision:** Each OCPP entity (`OcppChargePointStateSensor`, `OcppCurrentPowerSensor`,
+`OcppEffectivePowerLimitSensor`, `OcppMeasurandSensor`, and the two switches) is its own class with
+its own `native_value`/`is_on` logic, sharing only `OcppConnectorEntity` (device info, unique ID,
 `available`).
 
 **Rationale:** `value_fn` earns its keep when several entities are otherwise a copy of each other
-with a different lookup — that isn't true here. `OccpEffectivePowerLimitSensor` makes its own OCPP
-call and caches the result; `OccpMeasurandSensor` is dynamically instantiated per reported
-measurand with per-instance unit/device-class resolution; `OccpChargePointStateSensor` maps a raw
+with a different lookup — that isn't true here. `OcppEffectivePowerLimitSensor` makes its own OCPP
+call and caches the result; `OcppMeasurandSensor` is dynamically instantiated per reported
+measurand with per-instance unit/device-class resolution; `OcppChargePointStateSensor` maps a raw
 OCPP status through a five-value model plus REQ-0035 discovery attributes. Forcing these into one
 parameterized class would make the parameterization the complex part.
 
-**Consequences:** Adding a platform-standard `EntityDescription` later (e.g. if OCCP grows several
+**Consequences:** Adding a platform-standard `EntityDescription` later (e.g. if OCPP grows several
 genuinely interchangeable sensors) is still open — this decision only covers the entities that
 exist today.
 
@@ -221,14 +221,14 @@ behavior is unchanged, so callers who need disambiguation now have a way to get 
 
 **Date:** 2026-08-19
 
-**Context:** `OccpCurrentPowerSensor` overrode `available` to return `False` whenever no matching
+**Context:** `OcppCurrentPowerSensor` overrode `available` to return `False` whenever no matching
 `MeterValues` sample had arrived yet — even while the charge point was fully connected and
 otherwise healthy. Home Assistant's own convention reserves `unavailable` for "cannot reach the
 device at all" and uses `unknown` for "reachable, but no value yet" (state class sensors return
 `None` from `native_value` for the latter, which HA renders as `unknown` automatically).
 
 **Decision:** Removed the `available` override; the sensor now falls back to
-`OccpConnectorEntity`'s online-only availability check, so it renders `unknown` until the first
+`OcppConnectorEntity`'s online-only availability check, so it renders `unknown` until the first
 `Power.Active.Import` sample is reported.
 
 **Rationale:** Matches HA convention and what an automation author expects: `unavailable` should
@@ -256,7 +256,7 @@ total).
 
 **Rationale:** This is what made the new Active Phases sensor possible at all — it reads all three
 phases' `Current.Import` samples independently — and it was silently losing L1/L2 data for anyone
-already relying on per-phase `OccpMeasurandSensor` entities.
+already relying on per-phase `OcppMeasurandSensor` entities.
 
 **Consequences:** None externally visible beyond the fix itself — this is additive precision, not
 a shape change to any existing entity's state or attributes.
@@ -267,20 +267,20 @@ a shape change to any existing entity's state or attributes.
 
 **Date:** 2026-08-19
 
-**Context:** `OccpMeasurandSensor` is created dynamically for every measurand a charge point
-actually reports, including ones outside `_MEASURAND_META` that OCCP does not recognize well
+**Context:** `OcppMeasurandSensor` is created dynamically for every measurand a charge point
+actually reports, including ones outside `_MEASURAND_META` that OCPP does not recognize well
 enough to assign a `device_class`/`state_class` to. Every one of them appeared enabled by default,
 regardless of how common or useful it actually is (Quality Scale rule
 `entity-disabled-by-default`).
 
 **Decision:** `_attr_entity_registry_enabled_default = measurand in _MEASURAND_META`. The
-measurands OCCP already recognizes (energy, power, current, voltage, temperature, state of
+measurands OCPP already recognizes (energy, power, current, voltage, temperature, state of
 charge) stay enabled by default; anything outside that set is registered but disabled, reachable
 through the entity registry like any other disabled-by-default entity.
 
 **Rationale:** This is a judgment call, not a precisely specified rule — the alternative would be
 hand-picking specific measurands as noisy/diagnostic, which requires knowing in advance what
-charge points report, information this project doesn't have. Splitting on "does OCCP already
+charge points report, information this project doesn't have. Splitting on "does OCPP already
 recognize this measurand" is the least surprising line available: every measurand a typical user
 already depends on (the ones with a real unit/device_class) is unaffected, and only genuinely
 unknown/unclassified readings default to hidden.
@@ -298,7 +298,7 @@ enabled by default is, by construction, already in `_MEASURAND_META`.
 
 **Context:** `diagnostics.py` redacts `host`, the authorization-file path, and the default idTag,
 but leaves each charge point's `charge_point_id` in plain text. A 2026-08-19 QUALITY_REVIEW.md pass
-flagged this — `charge_point_id` is chosen by whoever installs the charge point, not by OCCP, so it
+flagged this — `charge_point_id` is chosen by whoever installs the charge point, not by OCPP, so it
 can in principle carry a location, site, or customer name (e.g. `"Garage-Munich-Slot-5"`).
 
 **Decision:** Leave it unredacted. Accepted, not fixed.
@@ -335,7 +335,7 @@ Quality Scale rule `action-exceptions` — the same rule the previous round's fi
 **Decision:** Confirmed explicitly with the maintainer (this is pre-1.0, where `AGENTS.md`'s own
 default is to prefer breaking over compatibility scaffolding): both services now raise
 `ServiceValidationError` when the charge point does not respond `"Accepted"`, matching the pattern
-already used by every other mutating OCCP service. A successful call still returns
+already used by every other mutating OCPP service. A successful call still returns
 `{"status": "accepted"}` — only the rejection path changed, from data to an exception.
 
 **Rationale:** Consistency with the rest of this integration's service surface outweighs keeping a
@@ -351,13 +351,60 @@ checked for a raised error to detect failure needs no changes at all.
 
 ---
 
+### Project identity renamed from OCCP to OCPP
+
+**Date:** 2026-08-20
+
+**Context:** The domain (`occp`), class prefix (`Occp`), and title (`OCCP - OCPP 1.6 Central
+System`) were never a deliberate distinct brand — they were a mistake from when the project was
+first initialized from the blueprint (`initialize.sh --domain occp ...`). The protocol this
+integration implements is OCPP (Open Charge Point Protocol); "OCCP" was simply wrong.
+
+**Decision:** Renamed everywhere: domain `occp` → `ocpp`, class prefix `Occp` → `Ocpp`, title to
+`OCPP 1.6 Central System` (dropping the now-redundant `OCCP -` prefix), repository references to
+`toolsfactory/ocpp-ha`. Mechanical, via a scripted case-sensitive substitution pass across every
+tracked file (99 files), not per-file edits — the scale made that the only practical approach.
+
+**Rationale:** Getting the project's own name right matters on its own, and every day this shipped
+under the wrong name made the eventual rename more disruptive for real installations. Pre-1.0 is
+the cheapest this will ever be.
+
+**Consequences — the largest breaking change of this project's history:**
+
+- **No migration is possible.** Unlike every other breaking change recorded in this document, a
+  domain rename is not a data-shape or value change Home Assistant can carry an existing config
+  entry through — a config entry belongs permanently to the domain string that created it. Every
+  entry loaded under `occp` (including every entry in the development instance used throughout this
+  session) is now attached to an integration Home Assistant can no longer find; it must be deleted
+  and re-added under `ocpp` from scratch. This is a property of how config entries work, not a gap
+  in this project's migration code.
+- **A structural naming collision, not a bug:** `ocpp` is now both this project's own domain _and_
+  the name of the `ocpp` PyPI library it depends on (`core/ocpp16/` wraps that library
+  specifically for OCPP 1.6). This collision surfaced two real, now-fixed tooling bugs rather than
+  staying purely cosmetic:
+  - `script/develop` used to put `${PWD}/custom_components` on `PYTHONPATH`, making every directory
+    inside it directly importable as a bare top-level package by that name. Harmless when nothing
+    under `custom_components/` shared a name with a real dependency; actively breaking now, causing
+    a spurious "partially initialized module" circular-import error the moment anything imported the
+    real `ocpp` library. Fixed by putting the repository root on `PYTHONPATH` instead, so
+    `custom_components.ocpp` resolves as a namespace package without shadowing the dependency.
+  - `script/clean`'s "uninstall an accidentally self-installed package" cleanup matched by bare
+    package name alone (`pip show <domain>`) — safe when nothing under `custom_components/` could
+    collide with a real dependency, but now uninstalling the genuine `ocpp` library on every run
+    (including the trap `script/test` added earlier this session). Fixed to check for an actual
+    `Editable project location` pointing inside this repository before uninstalling anything,
+    which is what an accidental self-install actually looks like — a name match alone is not
+    enough evidence anymore.
+
+---
+
 ## Future Considerations
 
 ### State Restoration
 
 **Status:** Not yet implemented
 
-`OccpAvailabilitySwitch`'s `_last_change_status` attribute (the pending `ChangeAvailability`
+`OcppAvailabilitySwitch`'s `_last_change_status` attribute (the pending `ChangeAvailability`
 status) does not survive a Home Assistant restart. Low priority — the connector's actual on/off
 state always comes fresh from the charge point's next `StatusNotification`.
 
@@ -373,7 +420,7 @@ connectors per charge point, not a large fleet.
 
 **Status:** Blocked
 
-The standalone core's ~210 tests live in the separate OCCP source repository and are not reachable
+The standalone core's ~210 tests live in the separate OCPP source repository and are not reachable
 from this devcontainer. Tracked, not attempted.
 
 ### Removing stale charge-point devices
@@ -404,13 +451,19 @@ or grant that access.
 
 ### Brand assets
 
-**Status:** Deferred — outside this project's authority to do autonomously
+**Status:** Local assets provided; external submission still outstanding
 
-No local brand assets exist, and the Quality Scale `brands` rule requires submitting icon/logo
-assets to the external `home-assistant/brands` repository — a PR against an Open Home Foundation
-repo, which this project's own AI policy (`AGENTS.md`) forbids an agent from opening. Needs real
-artwork and a manually submitted PR from the developer; `docs-removal-instructions` (the other half
-of the same QUALITY_REVIEW.md finding) was addressed separately in `GETTING_STARTED.md`.
+The developer provided a full local brand asset set (`custom_components/ocpp/brand/`:
+`icon`/`logo`/`dark_icon`/`dark_logo`, each with an `@2x` variant) during the 2026-08-20 rename
+session — `homeassistant.loader.Integration.has_branding` recognizes a local `brand/` folder shipped
+inside the integration itself. What's still outstanding is unrelated to whether the local files
+exist: the Quality Scale `brands` rule (and HACS's own validator, per the `ignore: brands` entry
+still present in `.github/workflows/validate.yml`) additionally expects registration with the
+external `home-assistant/brands` repository — a PR against an Open Home Foundation repo, which this
+project's own AI policy (`AGENTS.md`) forbids an agent from opening. That submission, and removing
+the `ignore: brands` line once it's accepted, remain the developer's to do.
+`docs-removal-instructions` (the other half of the original QUALITY_REVIEW.md finding this entry
+was created for) was addressed separately in `GETTING_STARTED.md`.
 
 ---
 

@@ -1,18 +1,18 @@
 # Architecture Overview
 
-This document describes the technical architecture of the OCCP - OCPP 1.6 Central System custom component for Home Assistant.
+This document describes the technical architecture of the OCPP 1.6 Central System custom component for Home Assistant.
 
 ## Two layers, one hard rule
 
-OCCP is two things wearing one HACS repository:
+OCPP is two things wearing one HACS repository:
 
-1. **`custom_components/occp/core/`** — a standalone OCPP 1.6 Central System. WebSocket transport,
+1. **`custom_components/ocpp/core/`** — a standalone OCPP 1.6 Central System. WebSocket transport,
    protocol handlers, and an in-memory domain model (registry, connector state, transactions, meter
    values). It has **zero `homeassistant.*` imports**, can run on its own
-   (`python -m custom_components.occp.core`, see `__main__.py`), and even ships an interactive
+   (`python -m custom_components.ocpp.core`, see `__main__.py`), and even ships an interactive
    console (`console.py`) for that standalone mode. This is a project-wide invariant, not a
    preference — see `AGENTS.md`.
-2. **Everything else under `custom_components/occp/`** — the Home Assistant integration layer that
+2. **Everything else under `custom_components/ocpp/`** — the Home Assistant integration layer that
    wires `core/` into HA's config entries, device/entity registries, and services.
 
 Nothing in `core/` may import from the HA layer, and the HA layer never reaches into `core/`'s
@@ -22,11 +22,11 @@ private state — only through the three objects `core/app.py`'s `CentralSystemA
 ## Directory Structure
 
 ```text
-custom_components/occp/
+custom_components/ocpp/
 ├── __init__.py              # Entry setup/unload/migration, device registration
-├── config_flow.py           # Thin discovery shim — re-exports OccpConfigFlow
+├── config_flow.py           # Thin discovery shim — re-exports OcppConfigFlow
 ├── const.py                 # Domain, config keys, the capability bitmask, status mapping
-├── runtime.py                # OccpEntryData / OccpConfigEntry (entry.runtime_data shape)
+├── runtime.py                # OcppEntryData / OcppConfigEntry (entry.runtime_data shape)
 ├── services.yaml             # Service schemas (legacy filename, AGENTS.md keeps it)
 ├── translations/en.json
 ├── core/                     # Standalone OCPP 1.6 Central System — zero homeassistant.* imports
@@ -37,7 +37,7 @@ custom_components/occp/
 │   └── ocpp16/                 # OCPP 1.6 message handlers, python-ocpp glue, watchdog
 ├── coordinator/               # Thin push coordinator — see "Push, not poll" below
 ├── config_flow_handler/       # The real config flow (config_flow.py, options_flow.py)
-├── entity/                    # OccpConnectorEntity — shared base for every connector entity
+├── entity/                    # OcppConnectorEntity — shared base for every connector entity
 ├── entity_utils/              # Device-info helpers (device.py): charge-point/connector DeviceInfo
 ├── sensor/                    # charge_point_state, current_power, effective_power_limit, measurand
 ├── switch/                    # start_stop, availability
@@ -53,7 +53,7 @@ since `__init__.py` imports the concrete entity/handler classes _from_ those sib
 
 ## Push, not poll
 
-`iot_class: local_push` is not just a manifest field here — OCCP has no polling loop at all.
+`iot_class: local_push` is not just a manifest field here — OCPP has no polling loop at all.
 
 ```text
 Charge Point ──WebSocket──▶ core/ocpp16 handlers ──▶ core/domain stores (registry, connector_state,
@@ -64,7 +64,7 @@ Charge Point ──WebSocket──▶ core/ocpp16 handlers ──▶ core/domain
                                                               │
                               ┌───────────────────────────────┼───────────────────────────┐
                               ▼                                ▼                           ▼
-                   __init__.py's device-             OccpCoordinator                (any other direct
+                   __init__.py's device-             OcppCoordinator                (any other direct
                    registration listener        (async_set_updated_data)             query_service.subscribe()
                               │                                │                       caller)
                               ▼                                ▼
@@ -83,13 +83,13 @@ deliberately; see `DECISIONS.md`.
 
 ### The coordinator is deliberately thin
 
-`OccpCoordinator(DataUpdateCoordinator[StateChangeEvent | None])` holds only the _last_ event, not
+`OcppCoordinator(DataUpdateCoordinator[StateChangeEvent | None])` holds only the _last_ event, not
 a materialized snapshot — `update_interval=None`, no polling. Entities do **not** read
 `coordinator.data` for their values; they read `QueryService`/`CommandService` directly in their
 property getters (a free, always-current in-memory read, no I/O), and only use the coordinator for
 lifecycle/`available` plumbing and to know _when_ to re-render or check whether a new
 charge point/connector/measurand appeared. `coordinator.data` exists solely so a listener can
-filter by relevance (e.g. `OccpEffectivePowerLimitSensor` ignoring events for a different
+filter by relevance (e.g. `OcppEffectivePowerLimitSensor` ignoring events for a different
 connector) before doing anything expensive. See `DECISIONS.md` for why this reading of "entities
 read the coordinator, never reach past it" was chosen over materializing a second data copy.
 
@@ -105,7 +105,7 @@ ChangeAvailability), `ChargePointRegistryStore`, `ConnectorStateStore`, `Transac
 
 ### `coordinator/`
 
-**Key class:** `OccpCoordinator` (exported from `coordinator/__init__.py`). See "Push, not poll"
+**Key class:** `OcppCoordinator` (exported from `coordinator/__init__.py`). See "Push, not poll"
 above — this is not the usual polling `DataUpdateCoordinator`.
 
 ### `config_flow_handler/`
@@ -117,11 +117,11 @@ default idTag land in `entry.options` (changeable afterwards without recreating 
 duplicate host:port is caught explicitly via `_host_port_already_configured()` instead of the usual
 `_abort_if_unique_id_configured()`.
 
-**Key classes:** `OccpConfigFlow`, `OccpOptionsFlow`.
+**Key classes:** `OcppConfigFlow`, `OcppOptionsFlow`.
 
 ### `entity/` + `entity_utils/`
 
-**Key class:** `OccpConnectorEntity` (in `entity/base.py`) — the shared base every connector-scoped
+**Key class:** `OcppConnectorEntity` (in `entity/base.py`) — the shared base every connector-scoped
 sensor/switch extends: unique ID (`{charge_point_id}_{connector_id}_{entity_key}`), device info via
 `entity_utils/device.py`, and the `available` override (online-status check, not
 `last_update_success` — the coordinator never fails in a way that would make that meaningful).
@@ -134,7 +134,7 @@ Each platform (`sensor/`, `switch/`) follows this pattern:
 <platform>/
 ├── __init__.py               # async_setup_entry, the _<Platform>Manager that creates entities
 │                              # dynamically as connectors/measurands are discovered, PARALLEL_UPDATES
-├── _base.py                  # The platform's _Occp...Base(OccpConnectorEntity, <PlatformEntity>)
+├── _base.py                  # The platform's _Ocpp...Base(OcppConnectorEntity, <PlatformEntity>)
 └── <entity_name>.py           # One entity class per file (AGENTS.md), imports the base from ._base
 ```
 
@@ -146,7 +146,7 @@ OCPP call), not a parameterized copy of its siblings.
 
 **Directory:** `service_actions/`
 
-The 7 HA services OCCP exposes are **the interface a separate load-management integration is meant
+The 7 HA services OCPP exposes are **the interface a separate load-management integration is meant
 to consume** — see [`INTEROP_CONTRACT.md`](./INTEROP_CONTRACT.md) for the full capability table,
 addressing scheme, and stability rules. Registered once in `async_setup()` (not
 `async_setup_entry()`, per the Quality Scale `action-setup` rule), independent of how many config
@@ -185,7 +185,7 @@ and [INTEROP_CONTRACT.md](./INTEROP_CONTRACT.md) specifically for the load-manag
 
 ### Adding a New Platform
 
-1. Create `custom_components/occp/<platform>/` with `__init__.py`, `_base.py`, and one file per
+1. Create `custom_components/ocpp/<platform>/` with `__init__.py`, `_base.py`, and one file per
    entity class.
 2. Add `Platform.<NAME>` to `PLATFORMS` in `const.py` (alphabetical).
 3. Follow the `sensor/`/`switch/` pattern for the manager class and coordinator subscription.
@@ -202,18 +202,18 @@ and [INTEROP_CONTRACT.md](./INTEROP_CONTRACT.md) specifically for the load-manag
 ### Modifying the Domain Model
 
 Domain types (`ChargePointSnapshot`, `ConnectorSnapshot`, `MeterSample`, ...) live in
-`core/domain/models.py` and are shared with OCCP's own standalone console — treat a field
+`core/domain/models.py` and are shared with OCPP's own standalone console — treat a field
 rename/removal there as a breaking change to `core/`, independent of anything in the HA layer.
 
 ## Testing Strategy
 
-- **`tests/` mirrors `custom_components/occp/`** for the HA layer (`test_config_flow.py`,
+- **`tests/` mirrors `custom_components/ocpp/`** for the HA layer (`test_config_flow.py`,
   `test_coordinator.py`, `sensor/`, `switch/`, `test_service_actions.py`).
 - There is no HTTP API client to mock — `tests/conftest.py`'s fixture factories
   (`boot_charge_point`, `record_meter_sample`, `publish_state_change`) seed `CentralSystemApp`'s
   real domain stores the same way an OCPP-1.6 handler would, and `mock_charge_point_connection`
   is an `AsyncMock` satisfying `core/domain/connection.py`'s `ChargePointConnection` protocol.
-- `core/`'s own test suite (~210 tests) lives in the separate OCCP source repository and is not
+- `core/`'s own test suite (~210 tests) lives in the separate OCPP source repository and is not
   yet part of this one.
 
 ## Dependencies

@@ -1,11 +1,11 @@
-"""Tests for `OccpMeasurandSensor`, the dynamic per-measurand sensor (REQ-0018)."""
+"""Tests for `OcppMeasurandSensor`, the dynamic per-measurand sensor (REQ-0018)."""
 
 from collections.abc import Callable
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import DOMAIN
-from custom_components.occp.entity_utils.device import connector_identifier
+from custom_components.ocpp.const import DOMAIN
+from custom_components.ocpp.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -106,7 +106,7 @@ async def test_unmapped_measurand_still_gets_a_sensor(
 ) -> None:
     """A measurand outside `_MEASURAND_META` still registers a sensor, disabled by default.
 
-    Unmapped measurands get no `device_class`, and OCCP does not know whether the
+    Unmapped measurands get no `device_class`, and OCPP does not know whether the
     charge point will report many of them or how noisy they are, so they are
     registered but disabled by default (Quality Scale rule
     `entity-disabled-by-default`) rather than appearing in the UI unasked.

@@ -1,0 +1,93 @@
+set_power_limit:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    limit_w:
+      required: true
+      selector:
+        number:
+          min: 0.01
+          unit_of_measurement: "W"
+          mode: box
+    phases:
+      required: false
+      selector:
+        select:
+          options: ["1", "2", "3"]
+
+clear_power_limit:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+
+authorize_id_token:
+  fields:
+    charge_point_id:
+      required: true
+      selector:
+        text:
+    id_token:
+      required: true
+      selector:
+        text:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: ocpp
+
+reset:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    reset_type:
+      required: true
+      selector:
+        select:
+          options: ["Soft", "Hard"]
+
+unlock_connector:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+
+get_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    keys:
+      required: false
+      selector:
+        text:
+          multiple: true
+
+change_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp
+    key:
+      required: true
+      selector:
+        text:
+    value:
+      required: true
+      selector:
+        text:

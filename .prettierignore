@@ -2,7 +2,7 @@
 config/
 !config/configuration.yaml
 custom_components/
-!custom_components/occp/
+!custom_components/ocpp/
 
 # Auto-generated release files
 CHANGELOG.md

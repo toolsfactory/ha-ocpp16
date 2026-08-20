@@ -1,8 +1,8 @@
-# Getting Started with OCCP - OCPP 1.6 Central System
+# Getting Started with OCPP 1.6 Central System
 
-This guide will help you install and set up the OCCP - OCPP 1.6 Central System custom integration for Home Assistant.
+This guide will help you install and set up the OCPP 1.6 Central System custom integration for Home Assistant.
 
-OCCP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server
+OCPP turns Home Assistant into an OCPP 1.6 **Central System**: it runs its own WebSocket server
 that charge points connect _to_. There is no external cloud service or device IP to poll — Home
 Assistant is the server, and charge points are the clients.
 
@@ -13,7 +13,7 @@ Assistant is the server, and charge points are the clients.
 - An OCPP 1.6 charge point (or a simulator, e.g.
   [shiv3/ocpp-cp-simulator](https://github.com/shiv3/ocpp-cp-simulator)) that can be pointed at a
   custom OCPP backend URL, and network connectivity from that charge point to Home Assistant
-- A free port on the Home Assistant host for OCCP's WebSocket server (default `9000`)
+- A free port on the Home Assistant host for OCPP's WebSocket server (default `9000`)
 
 ## Installation
 
@@ -23,18 +23,18 @@ Assistant is the server, and charge points are the clients.
 2. Go to "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/toolsfactory/occp-ha`
+5. Add this repository URL: `https://github.com/toolsfactory/ocpp-ha`
 6. Set category to "Integration"
 7. Click "Add"
-8. Find "OCCP - OCPP 1.6 Central System" in the integration list
+8. Find "OCPP 1.6 Central System" in the integration list
 9. Click "Download"
 10. Restart Home Assistant
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/toolsfactory/occp-ha/releases)
-2. Extract the `occp` folder from the archive
-3. Copy it to `custom_components/occp/` in your Home Assistant configuration directory
+1. Download the latest release from the [releases page](https://github.com/toolsfactory/ocpp-ha/releases)
+2. Extract the `ocpp` folder from the archive
+3. Copy it to `custom_components/ocpp/` in your Home Assistant configuration directory
 4. Restart Home Assistant
 
 ## Initial Setup
@@ -43,12 +43,12 @@ After installation, add the integration:
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
-3. Search for "OCCP - OCPP 1.6 Central System"
+3. Search for "OCPP 1.6 Central System"
 4. Follow the configuration steps:
 
 ### Step 1: Listen Address
 
-Enter where OCCP's WebSocket server should listen for charge point connections:
+Enter where OCPP's WebSocket server should listen for charge point connections:
 
 - **Host:** The bind address (default `0.0.0.0` — every network interface)
 - **Port:** The listen port (default `9000`)
@@ -61,8 +61,8 @@ something else is rejected immediately with a clear error rather than failing la
 - **Authorization File:** Path to a JSON file with a static idTag allow-list (see
   [CONFIGURATION.md](./CONFIGURATION.md) for the format). **Leaving this empty rejects every
   idTag**, not the other way around — set it (listing at least your **Default idTag**, below) if
-  you want to remote-start a transaction or use `occp.authorize_id_token` at all.
-- **Default idTag:** The idTag OCCP uses when the `start_stop` switch remote-starts a transaction.
+  you want to remote-start a transaction or use `ocpp.authorize_id_token` at all.
+- **Default idTag:** The idTag OCPP uses when the `start_stop` switch remote-starts a transaction.
   Required only if you plan to use that switch — and must appear in the authorization file above,
   or the charge point will reject the transaction as unauthorized.
 
@@ -81,7 +81,7 @@ ws://<home-assistant-host>:<port>/<chargePointId>
 ```
 
 using WebSocket subprotocol `ocpp1.6`. `<chargePointId>` is whatever identity the charge point
-sends — OCCP does not require pre-registration.
+sends — OCPP does not require pre-registration.
 
 ## What Gets Created
 
@@ -127,7 +127,7 @@ Add entities to your dashboard:
 1. Go to your dashboard
 2. Click **Edit Dashboard** → **Add Card**
 3. Choose card type (e.g., "Entities", "Glance")
-4. Select entities from "OCCP - OCPP 1.6 Central System"
+4. Select entities from "OCPP 1.6 Central System"
 
 Example entities card:
 
@@ -199,31 +199,31 @@ Enable debug logging to troubleshoot issues:
 logger:
   default: warning
   logs:
-    custom_components.occp: debug
+    custom_components.ocpp: debug
 ```
 
 Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs for detailed information.
 
 ## Removal
 
-1. Go to **Settings** → **Devices & Services** → **OCCP - OCPP 1.6 Central System**.
+1. Go to **Settings** → **Devices & Services** → **OCPP 1.6 Central System**.
 2. Open the instance you want to remove and select **Delete**.
 3. Home Assistant stops the WebSocket server, removes every device and entity that instance
    created, and deregisters its config entry automatically — no manual cleanup needed there.
 4. If you configured an idTag authorization file (outside the `config/` directory Home Assistant
    manages), it is left on disk untouched; delete it yourself if you no longer need it.
 5. To remove the integration entirely (all instances), also remove it via HACS or delete
-   `custom_components/occp/` if installed manually, then restart Home Assistant.
+   `custom_components/ocpp/` if installed manually, then restart Home Assistant.
 
 ## Next Steps
 
 - See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options and the full service reference
 - See [EXAMPLES.md](./EXAMPLES.md) for more automation examples
-- Report issues at [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues)
+- Report issues at [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues)
 
 ## Support
 
 For help and discussion:
 
-- [GitHub Discussions](https://github.com/toolsfactory/occp-ha/discussions)
+- [GitHub Discussions](https://github.com/toolsfactory/ocpp-ha/discussions)
 - [Home Assistant Community Forum](https://community.home-assistant.io/)

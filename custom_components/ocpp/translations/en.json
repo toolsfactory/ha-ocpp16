@@ -1,0 +1,202 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up OCPP Central System",
+        "description": "Listen address and port for the OCPP 1.6 WebSocket endpoint (ws:// only, see REQ-0016). Optional: a path to a static idTag authorization list, and a fixed idTag for remote start (REQ-0020) -- both changeable later via \"Configure\".",
+        "data": {
+          "host": "Host / bind address",
+          "port": "Port",
+          "authorization_file": "Path to the idTag authorization list (optional)",
+          "default_id_tag": "idTag for remote start (optional)"
+        },
+        "data_description": {
+          "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
+          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points.",
+          "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure OCPP Central System",
+        "description": "Change the listen address and port for this OCPP instance. The authorization list and default idTag are changed via \"Configure\" instead.",
+        "data": {
+          "host": "Host / bind address",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
+          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points."
+        }
+      }
+    },
+    "error": {
+      "port_in_use": "The port is already in use. Please choose a different port.",
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON.",
+      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired."
+    },
+    "abort": {
+      "already_configured": "This Central System instance (host/port) is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "authorization_file": "Path to the idTag authorization list (optional)",
+          "default_id_tag": "idTag for remote start (optional)"
+        },
+        "data_description": {
+          "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
+          "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction."
+        }
+      }
+    },
+    "error": {
+      "invalid_authorization_file": "The file is not readable or does not contain valid JSON.",
+      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "charge_point_state": {
+        "name": "State",
+        "state": {
+          "not_connected": "Not Connected",
+          "ready": "Ready",
+          "charging": "Charging",
+          "unavailable": "Unavailable",
+          "error": "Error"
+        }
+      },
+      "current_power_w": {
+        "name": "Current Power"
+      },
+      "effective_power_limit_w": {
+        "name": "Effective Power Limit"
+      },
+      "active_phases": {
+        "name": "Active Phases"
+      },
+      "measurand": {
+        "name": "{measurand_name}"
+      }
+    },
+    "switch": {
+      "start_stop": {
+        "name": "Start/Stop"
+      },
+      "availability": {
+        "name": "Availability"
+      }
+    }
+  },
+  "services": {
+    "set_power_limit": {
+      "name": "Set power limit",
+      "description": "Sets a connector's charging power limit (interop contract capability 3).",
+      "fields": {
+        "limit_w": { "name": "Limit", "description": "Power limit in watts." },
+        "phases": { "name": "Phases", "description": "Optional number of phases (1-3)." }
+      }
+    },
+    "clear_power_limit": {
+      "name": "Clear power limit",
+      "description": "Removes a previously set charging power limit (interop contract capability 4)."
+    },
+    "authorize_id_token": {
+      "name": "Authorize idToken",
+      "description": "Queries OCPP's authorization source for an idToken (interop contract capability 8).",
+      "fields": {
+        "charge_point_id": { "name": "Charge point ID", "description": "Identity of the charge point." },
+        "id_token": { "name": "idToken", "description": "idToken to check." },
+        "device_id": {
+          "name": "Device",
+          "description": "Optional. Disambiguates which OCPP instance to query when more than one instance happens to know the same charge point ID."
+        }
+      }
+    },
+    "reset": {
+      "name": "Reset",
+      "description": "Resets the charging station (soft or hard reset).",
+      "fields": {
+        "reset_type": { "name": "Type", "description": "Soft (restart the software) or Hard (restart the hardware)." }
+      }
+    },
+    "unlock_connector": {
+      "name": "Unlock connector",
+      "description": "Asks the charging station to unlock the connector."
+    },
+    "get_configuration": {
+      "name": "Get configuration",
+      "description": "Reads configuration values from the charging station.",
+      "fields": {
+        "keys": { "name": "Keys", "description": "Optional list of configuration keys to query -- leave empty for all." }
+      }
+    },
+    "change_configuration": {
+      "name": "Change configuration",
+      "description": "Sets a single configuration value on the charging station.",
+      "fields": {
+        "key": { "name": "Key", "description": "Name of the configuration key." },
+        "value": { "name": "Value", "description": "New value for the configuration key." }
+      }
+    }
+  },
+  "exceptions": {
+    "device_not_found": {
+      "message": "Unknown device \"{device_id}\"."
+    },
+    "device_entry_not_loaded": {
+      "message": "Device \"{device_id}\" belongs to no loaded OCPP config entry."
+    },
+    "device_not_connector": {
+      "message": "Device \"{device_id}\" is not an OCPP connector (it may be the charge point itself) -- this action requires a connector device."
+    },
+    "device_is_connector": {
+      "message": "Device \"{device_id}\" is a connector -- this action requires the charge point device itself."
+    },
+    "device_not_ocpp": {
+      "message": "Device \"{device_id}\" does not belong to OCPP."
+    },
+    "unknown_charge_point": {
+      "message": "Unknown charge point \"{charge_point_id}\"."
+    },
+    "authorization_file_unreadable": {
+      "message": "The authorization file \"{path}\" could not be read. Check that it still exists and contains valid JSON."
+    },
+    "bind_failed": {
+      "message": "Could not bind the WebSocket server to {host}:{port}. Check that nothing else is using this port."
+    },
+    "command_rejected": {
+      "message": "{error}"
+    },
+    "reset_rejected": {
+      "message": "Charging station rejected the reset command."
+    },
+    "unlock_rejected": {
+      "message": "Charging station did not unlock the connector (status: {status})."
+    },
+    "change_configuration_rejected": {
+      "message": "Charging station rejected the configuration change (status: {status})."
+    },
+    "power_limit_rejected": {
+      "message": "Charging station rejected the power limit change (status: {status})."
+    },
+    "no_default_id_tag": {
+      "message": "No idTag configured for remote start (REQ-0020) -- please set one when configuring the OCPP integration."
+    },
+    "start_rejected": {
+      "message": "Charging station rejected the start command (connector {connector_id})."
+    },
+    "no_active_transaction": {
+      "message": "No active transaction on connector {connector_id}."
+    },
+    "stop_rejected": {
+      "message": "Charging station rejected the stop command (connector {connector_id})."
+    },
+    "availability_change_rejected": {
+      "message": "Charging station rejected the availability change (connector {connector_id})."
+    }
+  }
+}

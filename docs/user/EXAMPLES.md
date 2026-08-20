@@ -1,7 +1,7 @@
 # Examples
 
 This page provides ready-to-use examples for automations, dashboards, and blueprints
-with the OCCP - OCPP 1.6 Central System custom integration.
+with the OCPP 1.6 Central System custom integration.
 
 Replace entity/device IDs like `sensor.ladepunkt_1` and `<connector device id>` with your actual
 ones after setting up the integration — see [GETTING_STARTED.md](./GETTING_STARTED.md) for how
@@ -51,7 +51,7 @@ automation:
       - trigger: time
         at: "22:00:00"
     action:
-      - action: occp.set_power_limit
+      - action: ocpp.set_power_limit
         data:
           device_id: <connector device id>
           limit_w: 3700
@@ -61,7 +61,7 @@ automation:
       - trigger: time
         at: "06:00:00"
     action:
-      - action: occp.clear_power_limit
+      - action: ocpp.clear_power_limit
         data:
           device_id: <connector device id>
 ```
@@ -98,7 +98,7 @@ Save this as a blueprint file and import it in Home Assistant:
 
 ```yaml
 blueprint:
-  name: OCCP Connector Error Alert
+  name: OCPP Connector Error Alert
   description: Send a notification when a connector's state becomes "error".
   domain: automation
   input:
@@ -107,7 +107,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: occp
+          integration: ocpp
     notify_target:
       name: Notification service
       default: notify.notify
@@ -185,5 +185,5 @@ first transaction.
 
 - [Configuration Reference](./CONFIGURATION.md) - All configuration options and the full service reference
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
-- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCCP
-- [GitHub Issues](https://github.com/toolsfactory/occp-ha/issues) - Report problems
+- [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
+- [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues) - Report problems

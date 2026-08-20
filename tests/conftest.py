@@ -1,4 +1,4 @@
-"""Shared fixtures for the occp tests."""
+"""Shared fixtures for the ocpp tests."""
 
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.occp.const import CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.occp.core.app import CentralSystemApp
-from custom_components.occp.core.domain.commands import ChargingSchedulePeriodInfo, CompositeScheduleResult
-from custom_components.occp.core.domain.models import MeterSample, StateChangeEvent
+from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp.core.app import CentralSystemApp
+from custom_components.ocpp.core.domain.commands import ChargingSchedulePeriodInfo, CompositeScheduleResult
+from custom_components.ocpp.core.domain.models import MeterSample, StateChangeEvent
 from homeassistant.core import HomeAssistant
 
 CHARGE_POINT_ID = "CP001"
@@ -25,8 +25,8 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
 def mock_app_start_stop() -> Generator[None]:
     """Patch `CentralSystemApp.start`/`stop` so setup never binds a real socket."""
     with (
-        patch("custom_components.occp.core.app.CentralSystemApp.start", new_callable=AsyncMock),
-        patch("custom_components.occp.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
+        patch("custom_components.ocpp.core.app.CentralSystemApp.start", new_callable=AsyncMock),
+        patch("custom_components.ocpp.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
     ):
         yield
 
@@ -36,7 +36,7 @@ def mock_config_entry() -> MockConfigEntry:
     """Return a config entry for this integration."""
     return MockConfigEntry(
         domain=DOMAIN,
-        title="OCCP (0.0.0.0:9000)",
+        title="OCPP (0.0.0.0:9000)",
         unique_id="0.0.0.0:9000",
         data={CONF_HOST: "0.0.0.0", CONF_PORT: 9000},
     )

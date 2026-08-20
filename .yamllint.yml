@@ -1,5 +1,5 @@
 ---
-# yamllint configuration for occp
+# yamllint configuration for ocpp
 # Documentation: https://yamllint.readthedocs.io/en/stable/rules.html
 
 extends: default
