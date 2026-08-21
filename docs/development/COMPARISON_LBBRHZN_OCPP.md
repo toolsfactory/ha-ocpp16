@@ -16,7 +16,7 @@ Verglichen wurden:
 - dessen Repository, Manifest, Config Flow, Entity-Plattformen, Actions, Tests und
   [Read-the-Docs-Dokumentation](https://home-assistant-ocpp.readthedocs.io/en/stable/);
 - dieses Repository auf dem lokalen Stand vom 21. August 2026;
-- der letzte vollständige lokale Qualitätslauf: 142 Tests, 78 Prozent Coverage, Lint, Typprüfung und Hassfest grün.
+- der letzte vollständige lokale Qualitätslauf: 235 Tests, 93 Prozent Coverage, Lint, Typprüfung und Hassfest grün.
 
 Der Fremdcode wurde statisch untersucht. Seine Tests wurden nicht lokal ausgeführt und seine reale Hardwareerfahrung
 wurde nur anhand öffentlich dokumentierter Geräte, Issues und Diskussionen bewertet.
@@ -57,7 +57,7 @@ umgesetzt, siehe Phase 5).
 | Action-Registrierung | Beim Erzeugen des Central Systems je Entry                                                          | Einmalig in `async_setup()`                                    | Eigenes Modell aktueller      |
 | Entity-Metadaten     | Teilweise hardcodierte Namen und Icons                                                              | Translation Keys und `icons.json`                              | Eigenes Modell aktueller      |
 | Modularität          | Große Plattform-, API- und Charge-Point-Module                                                      | Kleine, fokussierte Pakete und Klassen                         | Eigenes Modell wartbarer      |
-| Tests                | 273 Testfunktionen; Coverage per Codecov berichtet, kein `fail_under`-Grenzwert in CI (verifiziert) | 142 Testfälle; 78 Prozent Coverage                             | Extern klar stärker           |
+| Tests                | 273 Testfunktionen; Coverage per Codecov berichtet, kein `fail_under`-Grenzwert in CI (verifiziert) | 235 Testfälle; 93 Prozent Coverage                             | Extern noch mehr Testfälle    |
 | CI                   | Pytest, Coverage-Report, Hassfest und HACS                                                          | Lint/Hassfest; Typprüfung und Tests nicht verpflichtend        | Extern klar stärker           |
 | Dokumentation        | Eigene Website und Supported-Devices-Katalog                                                        | Architektur-, Entscheidungs- und Interop-Dokumente             | Unterschiedliche Stärken      |
 
@@ -129,13 +129,18 @@ der vorherigen voraus.
 
 ### Phase 1 – CI als verbindliche Qualitätsgrenze etablieren
 
-**Status: offen (Recheck 2026-08-21).** Der bestehende Workflow führt nur `script/lint-check` aus;
-`script/type-check`, `script/test --cov` und ein erzwungener Coverage-Grenzwert fehlen. Die lokal
-gemessene Coverage liegt mit 78 Prozent zudem noch unter dem beschlossenen Ziel von 90 Prozent.
+**Status: Coverage-Ziel erreicht, CI-Gate noch offen (2026-08-21).** Die lokal gemessene Coverage
+liegt jetzt bei 93 Prozent (vorher 78 Prozent) -- über dem beschlossenen Ziel von 90 Prozent.
+Erreicht durch gezielte Tests der bis dahin ungedeckten Kernmodule: `core/config.py` (53% -> 100%),
+`core/__main__.py` (0% -> 94%), `core/ocpp16/handlers.py` (38% -> 100%, vorher hatte kein Test je
+`ChargePointHandler` instanziiert), `core/console.py` (0% -> 100%) und `core/transport.py`
+(41% -> 100%, inklusive eines echten `wss://`-Handshakes -- schließt zugleich Phase 5s offene
+Live-Verifikationslücke). Der bestehende Workflow führt weiterhin nur `script/lint-check` aus;
+`script/type-check`, `script/test --cov` und ein erzwungener Coverage-Grenzwert fehlen dort noch.
 
-**Empfehlung:** Zuerst die aussagekräftigen, bislang ungedeckten Pfade bis mindestens 90 Prozent
-abdecken. Danach Typprüfung, Tests und `fail_under = 90` gemeinsam als verpflichtende CI-Grenze
-aktivieren und mit einem absichtlichen Typ- und Testfehler verifizieren.
+**Empfehlung:** Typprüfung, Tests und `fail_under = 90` gemeinsam als verpflichtende CI-Grenze
+aktivieren und mit einem absichtlichen Typ- und Testfehler verifizieren -- die Coverage-Arbeit
+selbst ist nicht mehr blockierend, nur noch das Verdrahten des CI-Gates.
 
 - **Ziel:** Kein Typ- oder Testfehler kann mit grüner CI zusammengeführt werden.
 - **Dateien:** `.github/workflows/lint.yml` oder neue fokussierte Workflows, gegebenenfalls `pyproject.toml` und
@@ -260,11 +265,13 @@ kein HTTP-Client ist, der Host-basiertes Routing versteht.
   Tabelle, Reconfigure-Flow, Netzwerk-Abschnitt), `DECISIONS.md`.
 
 - **Ziel:** Ladepunkte können sich ohne externen Reverse Proxy per `wss://` verbinden.
-- **Verifikation:** 6 neue automatisierte Tests (gültiges Zertifikat, unvollständiges Paar, ungültiges
-  Zertifikat, Reconfigure fügt TLS hinzu, Zertifikat verschwindet nach Setup, `AppConfig`-Verdrahtung)
-  -- alle grün, `script/lint`/`script/type-check`/`script/hassfest` sauber, 142 Tests insgesamt.
-  Ein echter `wss://`-Handshake gegen einen Fake-Charge-Point mit selbstsigniertem Zertifikat steht
-  noch aus (kein Live-Test in dieser Session durchgeführt).
+- **Verifikation:** 6 automatisierte Tests am Config-Flow (gültiges Zertifikat, unvollständiges Paar,
+  ungültiges Zertifikat, Reconfigure fügt TLS hinzu, Zertifikat verschwindet nach Setup,
+  `AppConfig`-Verdrahtung), plus seit dem Coverage-Recheck (2026-08-21) ein echter
+  `wss://`-Handshake in `tests/core/test_transport.py`: `start_server()` bindet einen echten
+  `127.0.0.1`-Socket mit selbstsigniertem Zertifikat (`tls_cert_pair`-Fixture), ein echter
+  `websockets`-Client verbindet sich und schließt eine vollständige BootNotification ab -- die
+  zuvor offene Live-Verifikationslücke ist damit geschlossen.
 - **Unabhängig auslieferbar:** ja.
 - **Breaking Change:** keiner -- rein additive Konfiguration, `ws://` bleibt der Default und bleibt
   unterstützt.
@@ -299,8 +306,9 @@ kein HTTP-Client ist, der Host-basiertes Routing versteht.
 Phase 0 (Vertrags-/Dokumentationslücken) wurde am 2026-08-21 vollständig umgesetzt (Commit `26e9a17`) und ist aus
 diesem Plan entfernt.
 
-1. Phase 1: CI-Coverage-Grenzwert auf 90 Prozent festgelegt (2026-08-21); Umsetzung hängt an
-   Workflow-Schreibrechten.
+1. Phase 1: CI-Coverage-Grenzwert auf 90 Prozent festgelegt (2026-08-21), Coverage-Arbeit
+   abgeschlossen (78% -> 93%, 2026-08-21); nur das CI-Gate selbst (`.github/workflows/lint.yml`)
+   hängt noch an Workflow-Schreibrechten.
 2. Phase 2 ist pausiert, bis reale Geräte verfügbar sind — nur die Struktur (`SUPPORTED_DEVICES.md`-Gerüst) wurde
    vorbereitet, keine Geräteeinträge.
 3. Phase 3 umgesetzt (2026-08-21).
@@ -319,8 +327,6 @@ diesem Plan entfernt.
   (Coverage-Grenzwert selbst ist mit 90 Prozent bereits entschieden).
 - **Stale Devices:** Die bestehende Entscheidung zu manueller oder zeitbasierter Entfernung bleibt offen und ist
   unabhängig von diesem Vergleich.
-- **TLS-Live-Verifikation aussteht:** Phase 5 ist umgesetzt und automatisiert getestet, aber ein echter
-  `wss://`-Handshake gegen einen Fake-Charge-Point wurde in dieser Session nicht durchgeführt.
 - **Erweiterte Operationen:** Konkrete Geräte- oder Nutzeranforderungen entscheiden den Umfang; blockiert Phase 6.
 - **OCPP 2.x:** Benötigt ein eigenes bestätigtes Zielbild; blockiert Phase 7 vollständig.
 
