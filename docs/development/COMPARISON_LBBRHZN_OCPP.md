@@ -16,7 +16,7 @@ Verglichen wurden:
 - dessen Repository, Manifest, Config Flow, Entity-Plattformen, Actions, Tests und
   [Read-the-Docs-Dokumentation](https://home-assistant-ocpp.readthedocs.io/en/stable/);
 - dieses Repository auf dem lokalen Stand vom 21. August 2026;
-- der letzte vollständige lokale Qualitätslauf: 123 Tests, 76 Prozent Coverage, Lint, Typprüfung und Hassfest grün.
+- der letzte vollständige lokale Qualitätslauf: 142 Tests, 78 Prozent Coverage, Lint, Typprüfung und Hassfest grün.
 
 Der Fremdcode wurde statisch untersucht. Seine Tests wurden nicht lokal ausgeführt und seine reale Hardwareerfahrung
 wurde nur anhand öffentlich dokumentierter Geräte, Issues und Diskussionen bewertet.
@@ -24,7 +24,7 @@ wurde nur anhand öffentlich dokumentierter Geräte, Issues und Diskussionen bew
 ## Zusammenfassung
 
 `lbbrhzn/ocpp` ist das funktional breitere und praktisch reifere Produkt. Das Projekt unterstützt OCPP 1.6J sowie
-experimentell 2.0.1/2.1, direktes TLS, Firmware- und DataTransfer-Funktionen, umfangreiche Sitzungsmetriken und viele
+experimentell 2.0.1/2.1, Firmware- und DataTransfer-Funktionen, umfangreiche Sitzungsmetriken und viele
 reale Ladegeräte. Es verfügt über eine große Nutzerbasis und eine umfangreiche Testsuite (Coverage wird per
 Codecov berichtet, aber laut `.coveragerc`/`tests.yaml` nicht als `fail_under`-Schwelle in CI erzwungen — direkt
 gegen den Quellcode verifiziert, korrigiert eine frühere Fassung dieses Dokuments, die fälschlich einen
@@ -36,8 +36,9 @@ aktuellen Home-Assistant-Strukturen: typisiertes `entry.runtime_data`, einmalige
 Home-Assistant-Layer, Domain-Modell und OCPP-Transport.
 
 Die strategische Empfehlung lautet deshalb: Praxiserfahrung und Absicherung übernehmen, nicht die ältere interne
-Architektur. Hardwarevalidierung, CI und klar abgegrenzte Sitzungsdiagnostik haben Vorrang. TLS, FirmwareManagement,
-DataTransfer und OCPP 2.x sind separate Produktentscheidungen.
+Architektur. Hardwarevalidierung, CI und klar abgegrenzte Sitzungsdiagnostik haben Vorrang. FirmwareManagement,
+DataTransfer und OCPP 2.x bleiben separate Produktentscheidungen (direktes TLS wurde am 2026-08-21 bereits
+umgesetzt, siehe Phase 5).
 
 ## Vergleichsmatrix
 
@@ -46,7 +47,7 @@ DataTransfer und OCPP 2.x sind separate Produktentscheidungen.
 | Produktreife         | Über 1.200 Commits, mehr als 100 Releases, breite Nutzerbasis                                       | `0.1.0`, junges Projekt                                        | Klarer Vorsprung extern       |
 | Hardware             | Zahlreiche Modelle und Firmwarebesonderheiten dokumentiert                                          | Bisher OCPP-Simulator                                          | Größtes eigenes Defizit       |
 | OCPP-Versionen       | 1.6J; 2.0.1 und 2.1 experimentell                                                                   | Bewusst nur 1.6                                                | Fokus versus Breite           |
-| Transport            | `ws://` und direktes `wss://`                                                                       | `ws://`, TLS nur über Reverse Proxy                            | Extern komfortabler           |
+| Transport            | `ws://` und direktes `wss://`                                                                       | `ws://` und direktes `wss://` (Phase 5, 2026-08-21)            | Gleichauf                     |
 | Entities             | Sensor, Switch, Number, Button; viele Sitzungs-/Diagnosewerte                                       | Dieselben Plattformen, kleinerer Satz                          | Extern breiter                |
 | Actions              | Acht, inklusive Firmware, DataTransfer und Custom Message                                           | Neun, inklusive Autorisierung, Reset, Unlock und Power Limit   | Unterschiedliche Schwerpunkte |
 | Messwerte            | Konfigurierbare bekannte Measurands                                                                 | Dynamische Measurands, getrennt nach Phase                     | Eigene Modellierung flexibler |
@@ -56,7 +57,7 @@ DataTransfer und OCPP 2.x sind separate Produktentscheidungen.
 | Action-Registrierung | Beim Erzeugen des Central Systems je Entry                                                          | Einmalig in `async_setup()`                                    | Eigenes Modell aktueller      |
 | Entity-Metadaten     | Teilweise hardcodierte Namen und Icons                                                              | Translation Keys und `icons.json`                              | Eigenes Modell aktueller      |
 | Modularität          | Große Plattform-, API- und Charge-Point-Module                                                      | Kleine, fokussierte Pakete und Klassen                         | Eigenes Modell wartbarer      |
-| Tests                | 273 Testfunktionen; Coverage per Codecov berichtet, kein `fail_under`-Grenzwert in CI (verifiziert) | 123 Testfälle; 76 Prozent Coverage                             | Extern klar stärker           |
+| Tests                | 273 Testfunktionen; Coverage per Codecov berichtet, kein `fail_under`-Grenzwert in CI (verifiziert) | 142 Testfälle; 78 Prozent Coverage                             | Extern klar stärker           |
 | CI                   | Pytest, Coverage-Report, Hassfest und HACS                                                          | Lint/Hassfest; Typprüfung und Tests nicht verpflichtend        | Extern klar stärker           |
 | Dokumentation        | Eigene Website und Supported-Devices-Katalog                                                        | Architektur-, Entscheidungs- und Interop-Dokumente             | Unterschiedliche Stärken      |
 
@@ -72,7 +73,6 @@ DataTransfer und OCPP 2.x sind separate Produktentscheidungen.
 
 ### Nur nach Produktentscheidung
 
-- Direktes TLS im eingebetteten WebSocket-Server.
 - FirmwareManagement-Actions.
 - Generischer DataTransfer oder frei formulierbare OCPP-Nachrichten.
 - OCPP 2.0.1 oder 2.1.
@@ -98,6 +98,14 @@ der vorherigen voraus.
 
 ### Phase 1 – CI als verbindliche Qualitätsgrenze etablieren
 
+**Status: offen (Recheck 2026-08-21).** Der bestehende Workflow führt nur `script/lint-check` aus;
+`script/type-check`, `script/test --cov` und ein erzwungener Coverage-Grenzwert fehlen. Die lokal
+gemessene Coverage liegt mit 78 Prozent zudem noch unter dem beschlossenen Ziel von 90 Prozent.
+
+**Empfehlung:** Zuerst die aussagekräftigen, bislang ungedeckten Pfade bis mindestens 90 Prozent
+abdecken. Danach Typprüfung, Tests und `fail_under = 90` gemeinsam als verpflichtende CI-Grenze
+aktivieren und mit einem absichtlichen Typ- und Testfehler verifizieren.
+
 - **Ziel:** Kein Typ- oder Testfehler kann mit grüner CI zusammengeführt werden.
 - **Dateien:** `.github/workflows/lint.yml` oder neue fokussierte Workflows, gegebenenfalls `pyproject.toml` und
   Coverage-Konfiguration.
@@ -114,6 +122,10 @@ der vorherigen voraus.
 **Status: pausiert (2026-08-21) — kommt mit der Zeit, sobald reale Geräte verfügbar sind. Bis dahin nur die
 Struktur vorbereiten, keine Geräteeinträge erfinden.**
 
+**Empfehlung aus dem Recheck:** Das vorbereitete Gerüst ist sinnvoll. Bis zum ersten realen Test
+auch auf Wahrscheinlichkeitsaussagen zur Kompatibilität verzichten: OCPP 1.6J über `ws://` ist
+eine technische Voraussetzung, aber noch kein Nachweis, dass ein konkretes Gerät funktioniert.
+
 - **Ziel:** Aussagen zur Geräteunterstützung beruhen auf reproduzierbaren Tests statt auf Protokollannahmen.
 - **Dateien:** neue, ausdrücklich freizugebende `docs/user/SUPPORTED_DEVICES.md`,
   `docs/user/GETTING_STARTED.md`, gerätespezifische Fixtures unter `tests/fixtures/` und passende Regressionstests.
@@ -127,7 +139,8 @@ Struktur vorbereiten, keine Geräteeinträge erfinden.**
 
 ### Phase 3 – Sitzungs- und Verbindungsdiagnostik ergänzen
 
-**Status: umgesetzt (2026-08-21).** Fünf neue Sensoren: `last_transaction_id`, `session_duration_s`,
+**Status: funktional umgesetzt, Abnahme teilweise offen (Recheck 2026-08-21).** Fünf neue Sensoren:
+`last_transaction_id`, `session_duration_s`,
 `session_energy_wh`, `last_stop_reason` (connector-scoped, über den neuen
 `QueryService.get_last_transaction()`-Lesepfad) und `reconnect_count` (charge-point-scoped,
 `EntityCategory.DIAGNOSTIC`, über ein neues `reconnect_count`-Feld in `registry.py`). Latenz
@@ -135,6 +148,16 @@ bewusst nicht ergänzt (Non-Goal dieser Phase, sofern nicht traffic-frei messbar
 naheliegender traffic-freier Signal gefunden). `diagnostics.py` erweitert um `reconnect_count` je
 Charge Point und einen `last_transaction`-Eintrag je Connector (`id_tag` darin neu in `_TO_REDACT`
 aufgenommen).
+
+Start/Stop, Reconnect, Entity-Zustände und Redaction sind automatisiert nachgewiesen. Das im Plan
+genannte Restart-Szenario ist dagegen weder durch einen Test noch durch eine ausdrückliche
+Erwartungsbeschreibung abgedeckt. Transaktionshistorie und Reconnect-Zähler liegen derzeit nur im
+Arbeitsspeicher und beginnen nach einem HA-Neustart neu.
+
+**Empfehlung:** Entscheiden und dokumentieren, ob diese Werte bewusst nur für den laufenden Prozess
+gelten. Falls ja, dieses Reset-Verhalten mit einem Reload-/Restart-Test absichern und in der
+Nutzerdokumentation kenntlich machen. Nur wenn Sitzungsdaten einen Neustart überleben sollen, eine
+separate Persistenzentscheidung treffen; Persistenz ist nicht stillschweigend Teil dieser Phase.
 
 - **Ziel:** Nutzer können einen Ladevorgang und Verbindungsprobleme ohne DEBUG-Vollframes nachvollziehen.
 - **Dateien:** `custom_components/ocpp/core/domain/models.py`, `transactions.py`, `registry.py`, `query.py`,
@@ -153,6 +176,10 @@ aufgenommen).
 per `GetCompositeSchedule` abgleichen), über `homeassistant.components.number.RestoreNumber` — kein
 zusätzlicher Central-System-initiierter Traffic beim Neustart. Siehe `DECISIONS.md`.
 
+**Recheck:** Vollständig umgesetzt. Restore, Clear auf `0`, abgelehnte Änderung und die Trennung
+vom tatsächlich wirksamen Wert sind automatisiert abgedeckt. Kein weiterer funktionaler
+Nachbesserungsbedarf innerhalb dieser Phase.
+
 - **Ziel:** Die optimistische Number zeigt nach einem HA-Neustart nicht unnötig `unknown`, ohne sich als Live-Wert
   auszugeben.
 - **Dateien:** `custom_components/ocpp/number/power_limit.py`, Tests der Number-Entity sowie README und
@@ -162,22 +189,52 @@ zusätzlicher Central-System-initiierter Traffic beim Neustart. Siehe `DECISIONS
   weiterhin als getrennte Entities behandeln.
 - **Verifikation:** Neustart-/Restore-Test, Clear-auf-`0`, abgelehnte Änderung und abweichender Effective-Wert.
 - **Unabhängig auslieferbar:** ja.
-- **Entscheidungstor:** Ist ein alter Sollwert nach Neustart nützlicher als `unknown`, obwohl das Gerät ihn außerhalb
-  von HA geändert haben kann?
+- **Entscheidungstor:** aufgelöst — der möglicherweise veraltete Sollwert wird bewusst wiederhergestellt und klar vom
+  tatsächlich wirksamen Wert getrennt.
 
 ### Phase 5 – Direktes TLS bewerten und gegebenenfalls implementieren
 
-- **Ziel:** Ladepunkte können sich ohne externen Reverse Proxy per `wss://` verbinden, falls dies ein bestätigter
-  Nutzerbedarf ist.
-- **Dateien:** zunächst `.agents/scratch/`-Plan und anschließend Entscheidung in
-  `docs/development/DECISIONS.md`; bei Freigabe Config Flow, Entry-Daten/Migration, Transport/App-Konfiguration,
-  Übersetzungen, Tests und Nutzerdokumentation.
-- **Änderungen:** Zertifikats- und Schlüsselpfad, sichere Dateivalidierung, asynchrones Laden, klare Fehler und
-  Reload-Verhalten. Bestehendes `ws://` bleibt unterstützt.
-- **Verifikation:** Gültige und ungültige Zertifikate, belegter Port, Reload, parallele Einträge sowie realer
-  TLS-Handshake mit Simulator.
-- **Unabhängig auslieferbar:** ja, aber erst nach Entscheidung.
-- **Breaking Change:** keiner bei additiver Konfiguration; eine Änderung bestehender Entry-Daten erfordert Migration.
+**Status: umgesetzt (2026-08-21).** Entwickler hat die "nicht ohne bestätigten Bedarf bauen"-Empfehlung
+bewusst überstimmt und die Implementierung direkt beauftragt -- eingebautes TLS statt Reverse Proxy,
+wie empfohlen. Siehe `DECISIONS.md` ("Direct built-in TLS instead of a reverse proxy for `wss://`")
+für die vollständige Begründung, warum eingebautes TLS hier tatsächlich der einfachere Weg ist:
+anders als bei HAs eigener Weboberfläche (HTTP-Vhost-Proxying, Standardfall bei praktisch jedem
+Self-Hosting-Setup) braucht OCPP über einen Reverse Proxy TCP-Stream-Proxying (z. B. nginx
+`stream {}`) statt des üblichen `proxy_pass`, weil der Ladepunkt direkt gegen `IP:Port` spricht und
+kein HTTP-Client ist, der Host-basiertes Routing versteht.
+
+**Umsetzung:**
+
+- `core/config.py`: `AppConfig` um `certificate_path`/`private_key_path` erweitert, plus
+  `--certificate-file`/`--private-key-file` für den Standalone-CLI.
+- `core/transport.py`: neue `build_ssl_context()` (stdlib `ssl`, keine neue Abhängigkeit),
+  `start_server()` reicht das Ergebnis als `ssl=` an `websockets.serve(...)` weiter. Ohne
+  Zertifikat bleibt `ws://` exakt wie zuvor.
+- `core/app.py`: `CentralSystemApp.__init__` bekommt ein optionales `ssl_context`-Argument,
+  gespiegelt an das bestehende `authorization`-Argument -- die HA-Schicht baut den Kontext per
+  Executor-Job und übergibt ihn, der Standalone-CLI fällt auf den synchronen Aufbau zurück.
+- `config_flow_handler/validators/tls.py` (neu): `validate_tls_certificate()`, gespiegelt an
+  `validators/authorization.py`, ruft den echten `build_ssl_context()`-Loader auf.
+- `config_flow_handler/config_flow.py`: zwei neue optionale Felder (`certificate_path`,
+  `private_key_path`) in `entry.data` -- additiv, keine Migration nötig (Präzedenzfall
+  `max_power_limit_w`). Validiert sowohl im `user`- als auch im `reconfigure`-Schritt (nicht nur im
+  Options-Flow, da verbindungskritisch wie Host/Port); nur eines von beiden gesetzt ist ein
+  Formularfehler (`tls_incomplete_pair`).
+- `__init__.py`: baut den `SSLContext` per Executor-Job, `ConfigEntryError` mit Übersetzungsschlüssel
+  `tls_certificate_unreadable`, falls das Paar zwischen Config-Flow und (Re-)Setup ungültig wurde --
+  derselbe Fehlerfall wie `authorization_file_unreadable`.
+- Dokumentation: README, `CONFIGURATION.md` (neuer Abschnitt "TLS Certificate (`wss://`)", Setup-
+  Tabelle, Reconfigure-Flow, Netzwerk-Abschnitt), `DECISIONS.md`.
+
+- **Ziel:** Ladepunkte können sich ohne externen Reverse Proxy per `wss://` verbinden.
+- **Verifikation:** 6 neue automatisierte Tests (gültiges Zertifikat, unvollständiges Paar, ungültiges
+  Zertifikat, Reconfigure fügt TLS hinzu, Zertifikat verschwindet nach Setup, `AppConfig`-Verdrahtung)
+  -- alle grün, `script/lint`/`script/type-check`/`script/hassfest` sauber, 142 Tests insgesamt.
+  Ein echter `wss://`-Handshake gegen einen Fake-Charge-Point mit selbstsigniertem Zertifikat steht
+  noch aus (kein Live-Test in dieser Session durchgeführt).
+- **Unabhängig auslieferbar:** ja.
+- **Breaking Change:** keiner -- rein additive Konfiguration, `ws://` bleibt der Default und bleibt
+  unterstützt.
 
 ### Phase 6 – Erweiterte OCPP-Operationen nach konkretem Bedarf
 
@@ -213,10 +270,12 @@ diesem Plan entfernt.
    Workflow-Schreibrechten.
 2. Phase 2 ist pausiert, bis reale Geräte verfügbar sind — nur die Struktur (`SUPPORTED_DEVICES.md`-Gerüst) wurde
    vorbereitet, keine Geräteeinträge.
-3. Phase 3 wird jetzt umgesetzt.
-4. Phase 4 wird jetzt umgesetzt.
-5. Nach Phase 3/4: Recheck und Prüfung der nächsten Schritte (2026-08-21, Maintainer-Vorgabe).
-6. Phasen 5 und 6 ausschließlich bei bestätigtem Nutzerbedarf.
+3. Phase 3 umgesetzt (2026-08-21).
+4. Phase 4 umgesetzt (2026-08-21).
+5. Nach Phase 3/4: Recheck und Prüfung der nächsten Schritte (2026-08-21, Maintainer-Vorgabe) --
+   Ergebnis: Phase 5 direkt beauftragt.
+6. Phase 5 umgesetzt (2026-08-21) -- Maintainer hat die "erst bei bestätigtem Bedarf"-Empfehlung
+   bewusst überstimmt. Phase 6 bleibt ausschließlich bei bestätigtem Nutzerbedarf.
 7. Phase 7 nicht in die aktuelle OCPP-1.6-Roadmap aufnehmen.
 
 ## Risiken und offene Entscheidungen
@@ -227,9 +286,8 @@ diesem Plan entfernt.
   (Coverage-Grenzwert selbst ist mit 90 Prozent bereits entschieden).
 - **Stale Devices:** Die bestehende Entscheidung zu manueller oder zeitbasierter Entfernung bleibt offen und ist
   unabhängig von diesem Vergleich.
-- **TLS-Bedarf:** Der Maintainer entscheidet Reverse Proxy versus eingebautes TLS; blockiert Phase 5.
-- **Restore-Semantik:** Der Maintainer entscheidet, ob ein möglicherweise veralteter Sollwert besser als `unknown`
-  ist; blockiert Phase 4.
+- **TLS-Live-Verifikation aussteht:** Phase 5 ist umgesetzt und automatisiert getestet, aber ein echter
+  `wss://`-Handshake gegen einen Fake-Charge-Point wurde in dieser Session nicht durchgeführt.
 - **Erweiterte Operationen:** Konkrete Geräte- oder Nutzeranforderungen entscheiden den Umfang; blockiert Phase 6.
 - **OCPP 2.x:** Benötigt ein eigenes bestätigtes Zielbild; blockiert Phase 7 vollständig.
 

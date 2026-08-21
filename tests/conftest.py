@@ -1,9 +1,14 @@
 """Shared fixtures for the ocpp tests."""
 
 from collections.abc import Callable, Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -29,6 +34,38 @@ def mock_app_start_stop() -> Generator[None]:
         patch("custom_components.ocpp.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
     ):
         yield
+
+
+@pytest.fixture
+def tls_cert_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Write a throwaway self-signed TLS certificate/private key pair (PEM) for Phase 5 tests.
+
+    EC (not RSA) purely for speed -- these tests only need a certificate `ssl.SSLContext`
+    can load, not one a real charge point would trust.
+    """
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "ocpp-test.local")])
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=1))
+        .sign(private_key, hashes.SHA256())
+    )
+    cert_path = tmp_path / "cert.pem"
+    key_path = tmp_path / "key.pem"
+    cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    return cert_path, key_path
 
 
 @pytest.fixture

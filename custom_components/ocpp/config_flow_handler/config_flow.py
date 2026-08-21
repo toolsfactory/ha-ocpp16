@@ -9,9 +9,15 @@ den Entry neu anzulegen. ``unique_id`` ist eine zufällige UUID (Host/Port
 sind laut Projektregel keine zulässige unique_id-Quelle); ein Duplikat mit
 derselben Host/Port-Kombination wird stattdessen explizit über
 ``_host_port_already_configured`` abgefangen.
+
+Ein optionales TLS-Zertifikat/Schlüssel-Paar für direktes ``wss://`` (Phase 5, kein
+Reverse Proxy nötig) landet ebenfalls in ``entry.data`` -- verbindungskritisch wie
+Host/Port, daher auch im ``reconfigure``-Schritt änderbar statt nur im Options-Flow.
+Beide Felder leer lassen behält ``ws://`` bei; nur eines von beiden ist ein Formularfehler.
 """
 
 import socket
+import ssl
 from typing import Any
 from uuid import uuid4
 
@@ -19,10 +25,12 @@ import voluptuous as vol
 
 from custom_components.ocpp.const import (
     CONF_AUTHORIZATION_FILE,
+    CONF_CERTIFICATE_PATH,
     CONF_DEFAULT_ID_TAG,
     CONF_HOST,
     CONF_MAX_POWER_LIMIT_W,
     CONF_PORT,
+    CONF_PRIVATE_KEY_PATH,
     DEFAULT_HOST,
     DEFAULT_MAX_POWER_LIMIT_W,
     DEFAULT_PORT,
@@ -30,9 +38,11 @@ from custom_components.ocpp.const import (
 )
 from custom_components.ocpp.core.domain.authorization import IdTagStatus
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.core import HomeAssistant
 
 from .options_flow import OPTIONS_SCHEMA, OcppOptionsFlow
 from .validators.authorization import validate_authorization_file
+from .validators.tls import validate_tls_certificate
 
 
 def _try_bind_port(host: str, port: int) -> None:
@@ -46,6 +56,23 @@ def _try_bind_port(host: str, port: int) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((host, port))
+
+
+async def _validate_tls_pair(hass: HomeAssistant, certificate_path: str, private_key_path: str) -> str | None:
+    """Validate an optional TLS certificate/private-key pair (Phase 5, direct `wss://`).
+
+    Returns a translation key for a form error, or `None` if the pair loads cleanly or
+    both fields are empty -- `wss://` stays opt-in, `ws://` is the unchanged default.
+    """
+    if bool(certificate_path) != bool(private_key_path):
+        return "tls_incomplete_pair"
+    if not certificate_path:
+        return None
+    try:
+        await hass.async_add_executor_job(validate_tls_certificate, certificate_path, private_key_path)
+    except OSError, ssl.SSLError:
+        return "tls_certificate_invalid"
+    return None
 
 
 class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -67,6 +94,8 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
 
             authorization_file = user_input.get(CONF_AUTHORIZATION_FILE, "")
             default_id_tag = user_input.get(CONF_DEFAULT_ID_TAG, "")
+            certificate_path = user_input.get(CONF_CERTIFICATE_PATH, "")
+            private_key_path = user_input.get(CONF_PRIVATE_KEY_PATH, "")
             try:
                 await self.hass.async_add_executor_job(_try_bind_port, host, port)
             except OSError:
@@ -85,10 +114,19 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
                 # nur ein akzeptierter Eintrag darf als Default gespeichert werden.
                 errors[CONF_DEFAULT_ID_TAG] = "default_id_tag_not_authorized"
             if not errors:
+                tls_error = await _validate_tls_pair(self.hass, certificate_path, private_key_path)
+                if tls_error:
+                    errors[CONF_CERTIFICATE_PATH] = tls_error
+            if not errors:
                 await self.async_set_unique_id(str(uuid4()))
                 return self.async_create_entry(
                     title=f"OCPP ({host}:{port})",
-                    data={CONF_HOST: host, CONF_PORT: port},
+                    data={
+                        CONF_HOST: host,
+                        CONF_PORT: port,
+                        CONF_CERTIFICATE_PATH: certificate_path,
+                        CONF_PRIVATE_KEY_PATH: private_key_path,
+                    },
                     options={
                         CONF_AUTHORIZATION_FILE: authorization_file,
                         CONF_DEFAULT_ID_TAG: user_input.get(CONF_DEFAULT_ID_TAG, ""),
@@ -100,6 +138,8 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_HOST, default=DEFAULT_HOST): str,
                 vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+                vol.Optional(CONF_CERTIFICATE_PATH): str,
+                vol.Optional(CONF_PRIVATE_KEY_PATH): str,
             }
         ).extend(OPTIONS_SCHEMA.schema)
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
@@ -136,6 +176,8 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input[CONF_HOST]
             port = user_input[CONF_PORT]
+            certificate_path = user_input.get(CONF_CERTIFICATE_PATH, "")
+            private_key_path = user_input.get(CONF_PRIVATE_KEY_PATH, "")
 
             if self._host_port_already_configured(host, port, exclude_entry_id=reconfigure_entry.entry_id):
                 return self.async_abort(reason="already_configured")
@@ -146,8 +188,19 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["port"] = "port_in_use"
 
             if not errors:
+                tls_error = await _validate_tls_pair(self.hass, certificate_path, private_key_path)
+                if tls_error:
+                    errors[CONF_CERTIFICATE_PATH] = tls_error
+
+            if not errors:
                 return self.async_update_reload_and_abort(
-                    reconfigure_entry, data_updates={CONF_HOST: host, CONF_PORT: port}
+                    reconfigure_entry,
+                    data_updates={
+                        CONF_HOST: host,
+                        CONF_PORT: port,
+                        CONF_CERTIFICATE_PATH: certificate_path,
+                        CONF_PRIVATE_KEY_PATH: private_key_path,
+                    },
                 )
 
         schema = self.add_suggested_values_to_schema(
@@ -155,6 +208,8 @@ class OcppConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_HOST): str,
                     vol.Required(CONF_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+                    vol.Optional(CONF_CERTIFICATE_PATH): str,
+                    vol.Optional(CONF_PRIVATE_KEY_PATH): str,
                 }
             ),
             user_input if user_input is not None else reconfigure_entry.data,

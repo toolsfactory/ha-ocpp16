@@ -10,11 +10,13 @@ lebt ausschließlich hier unter ``custom_components/ocpp/`` (CLAUDE.md).
 
 import logging
 from pathlib import Path
+import ssl
 
 from custom_components.ocpp.core.app import CentralSystemApp
 from custom_components.ocpp.core.config import AppConfig
 from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider
 from custom_components.ocpp.core.domain.models import StateChangeEvent
+from custom_components.ocpp.core.transport import build_ssl_context
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
@@ -22,10 +24,12 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_AUTHORIZATION_FILE,
+    CONF_CERTIFICATE_PATH,
     CONF_DEFAULT_ID_TAG,
     CONF_HOST,
     CONF_MAX_POWER_LIMIT_W,
     CONF_PORT,
+    CONF_PRIVATE_KEY_PATH,
     DEFAULT_MAX_POWER_LIMIT_W,
     DOMAIN,
     PLATFORMS,
@@ -55,10 +59,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: OcppConfigEntry) -> bool
     authorization_path = (
         Path(entry.options[CONF_AUTHORIZATION_FILE]) if entry.options.get(CONF_AUTHORIZATION_FILE) else None
     )
+    certificate_path = Path(entry.data[CONF_CERTIFICATE_PATH]) if entry.data.get(CONF_CERTIFICATE_PATH) else None
+    private_key_path = Path(entry.data[CONF_PRIVATE_KEY_PATH]) if entry.data.get(CONF_PRIVATE_KEY_PATH) else None
     config = AppConfig(
         host=entry.data[CONF_HOST],
         port=entry.data[CONF_PORT],
         authorization_file=authorization_path,
+        certificate_path=certificate_path,
+        private_key_path=private_key_path,
     )
     if authorization_path is not None:
         try:
@@ -80,7 +88,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: OcppConfigEntry) -> bool
             ) from err
     else:
         authorization = None
-    app = CentralSystemApp(config, authorization=authorization)
+    if certificate_path is not None and private_key_path is not None:
+        try:
+            ssl_context = await hass.async_add_executor_job(build_ssl_context, certificate_path, private_key_path)
+        except (OSError, ssl.SSLError) as err:
+            # Derselbe Fehlerfall wie bei authorization_file oben: Der Config-Flow (Phase 5)
+            # validiert dasselbe Paar beim Speichern -- dieser Zweig greift, wenn eine der
+            # beiden Dateien danach entfernt/beschädigt wurde.
+            _LOGGER.debug("TLS certificate '%s' could not be loaded: %s", certificate_path, err, exc_info=True)
+            raise ConfigEntryError(
+                translation_domain=DOMAIN,
+                translation_key="tls_certificate_unreadable",
+                translation_placeholders={"path": str(certificate_path)},
+            ) from err
+    else:
+        ssl_context = None
+    app = CentralSystemApp(config, authorization=authorization, ssl_context=ssl_context)
     try:
         await app.start()
     except OSError as err:

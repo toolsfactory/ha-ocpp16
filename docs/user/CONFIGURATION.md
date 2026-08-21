@@ -8,16 +8,19 @@ This document describes all configuration options and settings available in the 
 
 These options are configured during initial setup via the Home Assistant UI.
 
-| Option                 | Type    | Required | Default   | Description                                                             |
-| ---------------------- | ------- | -------- | --------- | ----------------------------------------------------------------------- |
-| **Host**               | string  | Yes      | `0.0.0.0` | Bind address the OCPP WebSocket server listens on                       |
-| **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                               |
-| **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = reject every idTag |
-| **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start                     |
-| **Max Power Limit**    | number  | No       | `22000`   | Upper bound (watts) for the `number.power_limit_w` entity               |
+| Option                 | Type    | Required | Default   | Description                                                                                       |
+| ---------------------- | ------- | -------- | --------- | ------------------------------------------------------------------------------------------------- |
+| **Host**               | string  | Yes      | `0.0.0.0` | Bind address the OCPP WebSocket server listens on                                                 |
+| **Port**               | integer | Yes      | `9000`    | Listen port for the OCPP WebSocket server                                                         |
+| **Certificate Path**   | string  | No       | —         | Path to a PEM TLS certificate (see below); set together with Private Key Path for direct `wss://` |
+| **Private Key Path**   | string  | No       | —         | Path to the PEM private key matching the certificate                                              |
+| **Authorization File** | string  | No       | —         | Path to a JSON idTag allow-list (see below); empty = reject every idTag                           |
+| **Default idTag**      | string  | No       | —         | idTag the `start_stop` switch uses for remote-start                                               |
+| **Max Power Limit**    | number  | No       | `22000`   | Upper bound (watts) for the `number.power_limit_w` entity                                         |
 
 Host and port are test-bound during setup — a port already in use is rejected immediately with a
-clear error instead of failing later.
+clear error instead of failing later. Certificate Path and Private Key Path are validated the same
+way: an unreadable file or an invalid/mismatched pair is a form error, not a later setup failure.
 
 ### Authorization File Format
 
@@ -41,6 +44,27 @@ With no file configured, OCPP's authorization provider has an empty allow-list, 
 file listing at least the `Default idTag` if you want the `start_stop` switch or
 `ocpp.authorize_id_token` to work at all.
 
+### TLS Certificate (`wss://`)
+
+Setting both **Certificate Path** and **Private Key Path** makes the OCPP WebSocket server accept
+`wss://` connections directly, using Python's built-in `ssl` module — no reverse proxy needed. This
+is deliberate: unlike Home Assistant's own web UI, which a reverse proxy fronts via ordinary
+HTTP-vhost `proxy_pass`, OCPP charge points connect straight to `IP:port` and are not HTTP clients
+that understand host-based routing. Terminating TLS for OCPP through a reverse proxy needs
+TCP-stream proxying (e.g. nginx's `stream {}` block) — a materially harder setup for most home
+users than pointing this integration at a certificate and key file.
+
+Both files must be PEM-encoded, and the key must match the certificate — an invalid or mismatched
+pair is rejected at setup/reconfigure time with a form error, the same way an unreadable
+authorization file is. Leave both fields empty to keep plain `ws://`, which stays the default.
+
+```bash
+# Example: a self-signed certificate for local testing (a real deployment should use a
+# certificate a charge point will actually trust, e.g. from your own internal CA).
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+  -keyout key.pem -out cert.pem -days 365 -subj "/CN=homeassistant.local"
+```
+
 ### Options Flow
 
 The **Authorization File**, **Default idTag**, and **Max Power Limit** can all be changed after
@@ -59,15 +83,17 @@ Changing **Max Power Limit** updates every connector's `number.power_limit_w` en
 value immediately — it does not itself change any charge point's actual power limit, only what the
 number entity will let you set.
 
-### Reconfigure Flow (Host/Port)
+### Reconfigure Flow (Host/Port/TLS)
 
-The **Host** and **Port** can also be changed after setup, without deleting and re-adding the
-entry (and losing its devices/entities/history):
+The **Host**, **Port**, **Certificate Path**, and **Private Key Path** can also be changed after
+setup, without deleting and re-adding the entry (and losing its devices/entities/history) — they
+are connection-critical settings, grouped together the same way Host/Port already were:
 
 1. Go to **Settings** → **Devices & Services**
 2. Find the specific "OCPP (host:port)" entry you want to change
 3. Open its menu (⋮) and select **Reconfigure**
-4. Enter the new host/port — the same port-in-use check from initial setup applies
+4. Enter the new host/port, and optionally add or remove a certificate/key pair — the same
+   port-in-use and TLS-pair checks from initial setup apply
 5. Click **Submit** — the entry reloads on the new address automatically
 
 The Authorization File and Default idTag are not part of this flow — change those via **Configure**
@@ -285,8 +311,8 @@ Charge points connect _to_ Home Assistant, not the other way around:
 - Ensure the configured port is reachable from the charge point (open the port on Home Assistant's
   host firewall, forward it if the charge point is on a different network)
 - The charge point must be configured with `ws://<home-assistant-host>:<port>/<chargePointId>` and
-  subprotocol `ocpp1.6` — OCPP does not support `wss://` directly (put a reverse proxy in front if
-  the charge point requires TLS)
+  subprotocol `ocpp1.6` — or `wss://` if you configured a Certificate/Private Key Path (see
+  [TLS Certificate](#tls-certificate-wss) above); no reverse proxy is needed either way
 
 ### Push Behavior
 

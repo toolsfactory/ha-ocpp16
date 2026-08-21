@@ -23,6 +23,10 @@ class AppConfig:
     heartbeat_interval_seconds: int = 300
     heartbeat_grace_period_seconds: float = 5.0
     authorization_file: Path | None = None
+    # Direktes TLS (Phase 5, kein Reverse Proxy nötig): beide gesetzt -> `wss://`,
+    # sonst unverändert `ws://`. Siehe `CentralSystemApp.__init__`/`transport.build_ssl_context`.
+    certificate_path: Path | None = None
+    private_key_path: Path | None = None
 
     @property
     def heartbeat_timeout_seconds(self) -> float:
@@ -72,6 +76,20 @@ def parse_args(argv: list[str] | None = None) -> AppConfig:
         default=None,
         help="JSON-Datei mit statischer idTag-Autorisierungsliste (REQ-0005)",
     )
+    parser.add_argument(
+        "--certificate-file",
+        type=Path,
+        default=None,
+        dest="certificate_path",
+        help="TLS-Zertifikat (PEM) für direktes wss:// -- erfordert --private-key-file",
+    )
+    parser.add_argument(
+        "--private-key-file",
+        type=Path,
+        default=None,
+        dest="private_key_path",
+        help="Privater Schlüssel (PEM) zum TLS-Zertifikat -- erfordert --certificate-file",
+    )
     args = parser.parse_args(argv)
     return AppConfig(
         host=args.host,
@@ -80,4 +98,6 @@ def parse_args(argv: list[str] | None = None) -> AppConfig:
         heartbeat_interval_seconds=args.heartbeat_interval_seconds,
         heartbeat_grace_period_seconds=args.heartbeat_grace_period_seconds,
         authorization_file=args.authorization_file,
+        certificate_path=args.certificate_path,
+        private_key_path=args.private_key_path,
     )

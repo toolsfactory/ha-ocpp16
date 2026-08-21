@@ -3,10 +3,12 @@
     "step": {
       "user": {
         "title": "Set up OCPP Central System",
-        "description": "Listen address and port for the OCPP 1.6 WebSocket endpoint (ws:// only, see REQ-0016). Optional: a path to a static idTag authorization list, and a fixed idTag for remote start (REQ-0020) -- both changeable later via \"Configure\".",
+        "description": "Listen address and port for the OCPP 1.6 WebSocket endpoint (see REQ-0016). Optional: a TLS certificate/private key pair for a direct wss:// connection, a path to a static idTag authorization list, and a fixed idTag for remote start (REQ-0020) -- all changeable later via \"Configure\"/\"Reconfigure\".",
         "data": {
           "host": "Host / bind address",
           "port": "Port",
+          "certificate_path": "TLS certificate path (optional, enables wss://)",
+          "private_key_path": "TLS private key path (optional, enables wss://)",
           "authorization_file": "Path to the idTag authorization list (optional)",
           "default_id_tag": "idTag for remote start (optional)",
           "max_power_limit_w": "Maximum power limit"
@@ -14,6 +16,8 @@
         "data_description": {
           "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
           "port": "Port the OCPP 1.6 WebSocket server listens on for charge points.",
+          "certificate_path": "Path to a PEM-encoded TLS certificate. Leave both this and the private key path empty to keep plain ws:// -- set both to accept wss:// directly, without a reverse proxy.",
+          "private_key_path": "Path to the PEM-encoded private key matching the TLS certificate above.",
           "authorization_file": "Path to a JSON file containing a static list of allowed idTags.",
           "default_id_tag": "idTag the start/stop switch uses for RemoteStartTransaction.",
           "max_power_limit_w": "Upper bound (in watts) for the Power Limit number entity -- match your charge point's actual maximum (e.g. 11000 or 22000)."
@@ -21,21 +25,27 @@
       },
       "reconfigure": {
         "title": "Reconfigure OCPP Central System",
-        "description": "Change the listen address and port for this OCPP instance. The authorization list and default idTag are changed via \"Configure\" instead.",
+        "description": "Change the listen address, port, and TLS certificate for this OCPP instance. The authorization list and default idTag are changed via \"Configure\" instead.",
         "data": {
           "host": "Host / bind address",
-          "port": "Port"
+          "port": "Port",
+          "certificate_path": "TLS certificate path (optional, enables wss://)",
+          "private_key_path": "TLS private key path (optional, enables wss://)"
         },
         "data_description": {
           "host": "Network address the OCPP 1.6 WebSocket server listens on for charge points.",
-          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points."
+          "port": "Port the OCPP 1.6 WebSocket server listens on for charge points.",
+          "certificate_path": "Path to a PEM-encoded TLS certificate. Leave both this and the private key path empty to keep plain ws:// -- set both to accept wss:// directly, without a reverse proxy.",
+          "private_key_path": "Path to the PEM-encoded private key matching the TLS certificate above."
         }
       }
     },
     "error": {
       "port_in_use": "The port is already in use. Please choose a different port.",
       "invalid_authorization_file": "The file is not readable or does not contain valid JSON.",
-      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired."
+      "default_id_tag_not_authorized": "This idTag is not accepted by the authorization list -- it is missing, blocked, or expired.",
+      "tls_incomplete_pair": "Set both the certificate and private key path to enable wss://, or leave both empty to keep ws://.",
+      "tls_certificate_invalid": "The certificate/private key pair could not be loaded -- check that both files are readable and PEM-encoded, and that the key matches the certificate."
     },
     "abort": {
       "already_configured": "This Central System instance (host/port) is already configured."
@@ -217,6 +227,9 @@
     },
     "authorization_file_unreadable": {
       "message": "The authorization file \"{path}\" could not be read. Check that it still exists and contains valid JSON."
+    },
+    "tls_certificate_unreadable": {
+      "message": "The TLS certificate \"{path}\" (or its private key) could not be loaded. Check that both files still exist, are PEM-encoded, and that the key matches the certificate."
     },
     "bind_failed": {
       "message": "Could not bind the WebSocket server to {host}:{port}. Check that nothing else is using this port."

@@ -25,6 +25,13 @@ CONF_DEFAULT_ID_TAG = "default_id_tag"
 # siehe INTEROP_CONTRACT.md) -- nicht fest codiert, weil das real angeschlossene
 # Ladegerät selbst konfigurierbar ist (z. B. 11 kW oder 22 kW je nach Anschluss).
 CONF_MAX_POWER_LIMIT_W = "max_power_limit_w"
+# Additiv: optionales TLS-Zertifikat/Schlüssel-Paar für direktes wss:// ohne Reverse
+# Proxy (siehe DECISIONS.md "Direct built-in TLS instead of a reverse proxy for
+# wss://"). Verbindungskritisch wie Host/Port, daher in entry.data statt
+# entry.options -- additiv und per entry.data.get(...) gelesen, keine Migration nötig
+# (Präzedenzfall max_power_limit_w).
+CONF_CERTIFICATE_PATH = "certificate_path"
+CONF_PRIVATE_KEY_PATH = "private_key_path"
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 9000

@@ -12,10 +12,17 @@ kein Subprotokoll, schlägt der Handshake fehl, ohne dass wir das selbst
 prüfen müssten. Bietet er mehrere inkl. ``ocpp1.6`` an, wählt die Bibliothek
 das erste in ``subprotocols`` gelistete gemeinsame Protokoll — mit nur einem
 Eintrag ("ocpp1.6") ist das Ergebnis eindeutig.
+
+Direktes TLS (``wss://``, Phase 5) ist optional: ``build_ssl_context`` baut einen
+Server-``SSLContext`` aus einem Zertifikat/Schlüssel-Paar, ``start_server`` reicht ihn
+unverändert an ``websockets.serve(..., ssl=...)`` weiter -- ohne Zertifikat bleibt
+``ws://`` exakt wie zuvor.
 """
 
 import asyncio
 import logging
+from pathlib import Path
+import ssl
 
 import websockets
 from websockets.asyncio.server import Server, ServerConnection, serve
@@ -83,8 +90,27 @@ async def _on_heartbeat_timeout(handler: ChargePointHandler, cp_logger: logging.
     await handler.close_connection(reason="heartbeat timeout")
 
 
-async def start_server(config: AppConfig, services: HandlerServices) -> Server:
-    """Start the OCPP 1.6 WebSocket server and return the bound `Server`."""
+def build_ssl_context(certificate_path: Path, private_key_path: Path) -> ssl.SSLContext:
+    """Build a server-side TLS context for direct `wss://` support (Phase 5, no reverse proxy needed).
+
+    Läuft synchron (Datei-I/O + Zertifikats-Parsing) -- Aufrufer, die bereits in einer
+    laufenden Eventloop stehen (HA-Layer, Config-Flow-Validator), müssen
+    ``hass.async_add_executor_job`` nutzen. Wirft ``OSError`` (nicht lesbar/vorhanden)
+    oder ``ssl.SSLError`` (kein gültiges PEM-Zertifikat/Schlüssel-Paar bzw. Mismatch).
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=certificate_path, keyfile=private_key_path)
+    return context
+
+
+async def start_server(
+    config: AppConfig, services: HandlerServices, *, ssl_context: ssl.SSLContext | None = None
+) -> Server:
+    """Start the OCPP 1.6 WebSocket server and return the bound `Server`.
+
+    `ssl_context` enables direct `wss://` (Phase 5); `None` keeps the unchanged `ws://`
+    default.
+    """
 
     async def handler(connection: ServerConnection) -> None:
         await _run_connection(connection, services=services)
@@ -94,6 +120,8 @@ async def start_server(config: AppConfig, services: HandlerServices) -> Server:
         config.host,
         config.port,
         subprotocols=[Subprotocol("ocpp1.6")],
+        ssl=ssl_context,
     )
-    logger.info("OCPP-1.6-WebSocket-Server läuft auf %s:%s", config.host, config.port)
+    scheme = "wss" if ssl_context is not None else "ws"
+    logger.info("OCPP-1.6-WebSocket-Server läuft auf %s://%s:%s", scheme, config.host, config.port)
     return server

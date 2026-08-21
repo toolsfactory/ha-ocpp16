@@ -1,15 +1,18 @@
 """Tests for the OCPP config flow, options flow, and entry migration."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ocpp.const import (
     CONF_AUTHORIZATION_FILE,
+    CONF_CERTIFICATE_PATH,
     CONF_DEFAULT_ID_TAG,
     CONF_HOST,
     CONF_MAX_POWER_LIMIT_W,
     CONF_PORT,
+    CONF_PRIVATE_KEY_PATH,
     DEFAULT_MAX_POWER_LIMIT_W,
     DOMAIN,
 )
@@ -42,13 +45,90 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, tmp_path) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "OCPP (0.0.0.0:9500)"
-    assert result["data"] == {CONF_HOST: "0.0.0.0", CONF_PORT: 9500}
+    assert result["data"] == {
+        CONF_HOST: "0.0.0.0",
+        CONF_PORT: 9500,
+        CONF_CERTIFICATE_PATH: "",
+        CONF_PRIVATE_KEY_PATH: "",
+    }
     assert result["options"] == {
         CONF_AUTHORIZATION_FILE: str(auth_file),
         CONF_DEFAULT_ID_TAG: "TAG1",
         CONF_MAX_POWER_LIMIT_W: DEFAULT_MAX_POWER_LIMIT_W,
     }
     assert result["result"].unique_id is not None
+
+
+async def test_user_flow_creates_entry_with_tls(hass: HomeAssistant, tls_cert_pair: tuple[Path, Path]) -> None:
+    """A valid certificate/private key pair enables `wss://` (Phase 5, no reverse proxy)."""
+    cert_path, key_path = tls_cert_pair
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_CERTIFICATE_PATH: str(cert_path),
+                CONF_PRIVATE_KEY_PATH: str(key_path),
+            },
+        )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_CERTIFICATE_PATH] == str(cert_path)
+    assert result["data"][CONF_PRIVATE_KEY_PATH] == str(key_path)
+
+
+async def test_user_flow_incomplete_tls_pair_recovers(hass: HomeAssistant, tls_cert_pair: tuple[Path, Path]) -> None:
+    """A certificate without a matching private key (or vice versa) is a form error, not a half-set entry."""
+    cert_path, _key_path = tls_cert_pair
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_HOST: "0.0.0.0", CONF_PORT: 9500, CONF_CERTIFICATE_PATH: str(cert_path)},
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_CERTIFICATE_PATH: "tls_incomplete_pair"}
+
+
+async def test_user_flow_invalid_tls_certificate_recovers(
+    hass: HomeAssistant, tmp_path: Path, tls_cert_pair: tuple[Path, Path]
+) -> None:
+    """An unreadable/garbage certificate pair shows a form error instead of failing at setup time."""
+    bad_cert = tmp_path / "not_a_cert.pem"
+    bad_cert.write_text("not a certificate", encoding="utf-8")
+    bad_key = tmp_path / "not_a_key.pem"
+    bad_key.write_text("not a key", encoding="utf-8")
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_CERTIFICATE_PATH: str(bad_cert),
+                CONF_PRIVATE_KEY_PATH: str(bad_key),
+            },
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_CERTIFICATE_PATH: "tls_certificate_invalid"}
+
+    cert_path, key_path = tls_cert_pair
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_CERTIFICATE_PATH: str(cert_path),
+                CONF_PRIVATE_KEY_PATH: str(key_path),
+            },
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
 
 
 async def test_user_flow_port_in_use_recovers(hass: HomeAssistant) -> None:
@@ -196,9 +276,47 @@ async def test_reconfigure_flow_changes_host_and_port(hass: HomeAssistant, mock_
         )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
-    assert entry.data == {CONF_HOST: "0.0.0.0", CONF_PORT: 9600}
+    assert entry.data == {
+        CONF_HOST: "0.0.0.0",
+        CONF_PORT: 9600,
+        CONF_CERTIFICATE_PATH: "",
+        CONF_PRIVATE_KEY_PATH: "",
+    }
     assert entry.unique_id == "existing-uuid"
     assert entry.options == {CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""}
+
+
+async def test_reconfigure_flow_adds_tls(
+    hass: HomeAssistant, mock_app_start_stop: None, tls_cert_pair: tuple[Path, Path]
+) -> None:
+    """Reconfigure can add a TLS certificate/private key pair to an entry created without one."""
+    cert_path, key_path = tls_cert_pair
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCPP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+        options={CONF_AUTHORIZATION_FILE: "", CONF_DEFAULT_ID_TAG: ""},
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(_BIND_PATH):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_HOST: "0.0.0.0",
+                CONF_PORT: 9500,
+                CONF_CERTIFICATE_PATH: str(cert_path),
+                CONF_PRIVATE_KEY_PATH: str(key_path),
+            },
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_CERTIFICATE_PATH] == str(cert_path)
+    assert entry.data[CONF_PRIVATE_KEY_PATH] == str(key_path)
 
 
 async def test_reconfigure_flow_port_in_use_recovers(hass: HomeAssistant, mock_app_start_stop: None) -> None:
@@ -426,3 +544,26 @@ async def test_setup_fails_cleanly_when_authorization_file_disappears_after_setu
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert entry.error_reason_translation_key == "authorization_file_unreadable"
+
+
+async def test_setup_fails_cleanly_when_tls_certificate_disappears_after_setup(
+    hass: HomeAssistant, mock_app_start_stop: None, tmp_path
+) -> None:
+    """A certificate/key pair valid at config-flow time but missing at (re)setup time is a clean ConfigEntryError."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCPP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={
+            CONF_HOST: "0.0.0.0",
+            CONF_PORT: 9500,
+            CONF_CERTIFICATE_PATH: str(tmp_path / "gone_cert.pem"),
+            CONF_PRIVATE_KEY_PATH: str(tmp_path / "gone_key.pem"),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.error_reason_translation_key == "tls_certificate_unreadable"

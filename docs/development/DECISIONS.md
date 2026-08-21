@@ -412,6 +412,47 @@ this decision, only the "unknown after every restart" annoyance is fixed.
 
 ---
 
+### Direct built-in TLS instead of a reverse proxy for `wss://`
+
+**Date:** 2026-08-21
+
+**Context:** `COMPARISON_LBBRHZN_OCPP.md`'s Phase 5 flagged direct `wss://` support as a candidate
+feature, gated on confirmed user need. The obvious-looking alternative — "put a reverse proxy in
+front, like Home Assistant's own web UI already gets" — does not actually transfer: Home
+Assistant's web UI is proxied via ordinary HTTP virtual-host `proxy_pass` (the near-universal case
+for self-hosted setups), but a charge point is not an HTTP client with a hostname — it connects
+directly to a fixed `IP:port`. Proxying that requires TCP-stream proxying (e.g. nginx's `stream {}`
+block), a materially more advanced reverse-proxy configuration than the HTTP-vhost case most users
+already run. For OCPP specifically, "set up a reverse proxy" is realistically a _harder_ ask for a
+typical home user than "point the integration at a certificate and key file."
+
+**Decision:** Build TLS support directly into the integration: `core/transport.py`'s
+`build_ssl_context()` wraps `ssl.SSLContext.load_cert_chain()` (stdlib, no new dependency) and is
+passed as `ssl=` to `websockets.serve()`. Two new optional `entry.data` fields (`certificate_path`,
+`private_key_path`) drive it, validated at config-flow time via
+`config_flow_handler/validators/tls.py` -- exactly the pattern `validators/authorization.py`
+already established for the authorization file.
+
+**Rationale:** `websockets` already supports TLS natively via the standard-library `ssl` module, so
+there was no meaningful cost to building this in versus asking every self-hosting user to solve the
+harder TCP-stream-proxy problem themselves. Both fields are additive `entry.data` (connection-
+critical, like host/port) rather than `entry.options`, and read via `entry.data.get(...)` --
+consistent with the `max_power_limit_w` precedent, no migration was needed even though they landed
+in `entry.data`. Both fields are also part of the `reconfigure` step (not just initial setup),
+since they are connection-critical exactly like host/port already were.
+
+**Consequences:** `ws://` remains the unchanged default -- setting only one of the two fields is a
+form error (`tls_incomplete_pair`) rather than a half-configured entry, and a certificate that
+becomes unreadable after setup (moved, permissions changed, expired-and-removed) is a
+`ConfigEntryError` (`tls_certificate_unreadable`) at (re)setup time, mirroring how
+`authorization_file_unreadable` already behaves. `CentralSystemApp.__init__` mirrors the existing
+`authorization` parameter precedent: the HA layer builds the `SSLContext` itself via an executor
+job and injects it, while the standalone CLI (`core/config.py`'s `--certificate-file`/
+`--private-key-file`) falls back to the synchronous build, since it has no event loop yet at
+construction time.
+
+---
+
 ### Project identity renamed from OCCP to OCPP
 
 **Date:** 2026-08-20

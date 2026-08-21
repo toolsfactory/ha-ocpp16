@@ -58,6 +58,10 @@ something else is rejected immediately with a clear error rather than failing la
 
 ### Step 2: Optional Settings
 
+- **Certificate Path / Private Key Path:** Set both, pointing at a PEM certificate and its matching
+  private key, to accept `wss://` connections directly — no reverse proxy needed (see
+  [CONFIGURATION.md](./CONFIGURATION.md#tls-certificate-wss) for details). Leave both empty to keep
+  plain `ws://`.
 - **Authorization File:** Path to a JSON file with a static idTag allow-list (see
   [CONFIGURATION.md](./CONFIGURATION.md) for the format). **Leaving this empty rejects every
   idTag**, not the other way around — set it (listing at least your **Default idTag**, below) if
@@ -69,7 +73,7 @@ something else is rejected immediately with a clear error rather than failing la
   `22000`. Set this to your charge point's actual maximum (e.g. `11000` for an 11 kW connection) so
   the number entity's slider/box can't be set above what your hardware supports.
 
-All three of these can be changed later without recreating the integration — see
+All of these can be changed later without recreating the integration — see
 [CONFIGURATION.md](./CONFIGURATION.md).
 
 Click **Submit** to complete setup. Home Assistant now starts listening for charge point
@@ -83,8 +87,9 @@ Configure your charge point's (or simulator's) OCPP backend URL to:
 ws://<home-assistant-host>:<port>/<chargePointId>
 ```
 
-using WebSocket subprotocol `ocpp1.6`. `<chargePointId>` is whatever identity the charge point
-sends — OCPP does not require pre-registration.
+(`wss://` instead of `ws://` if you configured a certificate in Step 2), using WebSocket
+subprotocol `ocpp1.6`. `<chargePointId>` is whatever identity the charge point sends — OCPP does
+not require pre-registration.
 
 ## What Gets Created
 
@@ -197,7 +202,8 @@ See [EXAMPLES.md](./EXAMPLES.md) for more, including the power-limiting services
 ### Charge point does not appear
 
 1. Confirm the charge point's configured OCPP backend URL matches
-   `ws://<host>:<port>/<chargePointId>` and uses subprotocol `ocpp1.6`
+   `ws://<host>:<port>/<chargePointId>` (or `wss://` if a certificate is configured) and uses
+   subprotocol `ocpp1.6`
 2. Check that nothing else on the network is already bound to the configured port
 3. Check the Home Assistant log for connection attempts and rejected connections
 

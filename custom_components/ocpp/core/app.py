@@ -19,9 +19,11 @@ from custom_components.ocpp.core.domain.query import QueryServiceImpl
 from custom_components.ocpp.core.domain.registry import ChargePointRegistryStore
 from custom_components.ocpp.core.domain.transactions import TransactionManager
 from custom_components.ocpp.core.ocpp16.handlers import HandlerServices
-from custom_components.ocpp.core.transport import start_server
+from custom_components.ocpp.core.transport import build_ssl_context, start_server
 
 if TYPE_CHECKING:
+    import ssl
+
     from websockets.asyncio.server import Server
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,13 @@ logger = logging.getLogger(__name__)
 class CentralSystemApp:
     """Composition root for the standalone core: wires config into runnable domain services."""
 
-    def __init__(self, config: AppConfig, *, authorization: AuthorizationProvider | None = None) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        *,
+        authorization: AuthorizationProvider | None = None,
+        ssl_context: ssl.SSLContext | None = None,
+    ) -> None:
         """Build the domain services and handler wiring from `config`.
 
         `authorization` lets a caller running inside an event loop (the HA layer) load the
@@ -38,6 +46,10 @@ class CentralSystemApp:
         blocking `Path.read_text()` in `StaticAuthorizationProvider.from_json_file()` running
         directly on the loop. The standalone CLI has no event loop yet at construction time
         (see ``__main__.py``), so it is safe to let this fall back to the synchronous load.
+
+        `ssl_context` (Phase 5, direct `wss://`) mirrors `authorization` for the same reason:
+        the HA layer builds it itself via an executor job, the standalone CLI falls back to
+        the synchronous `build_ssl_context()` below.
         """
         self.config = config
         self.registry = ChargePointRegistryStore()
@@ -51,6 +63,12 @@ class CentralSystemApp:
             self.authorization = StaticAuthorizationProvider.from_json_file(config.authorization_file)
         else:
             self.authorization = StaticAuthorizationProvider.empty()
+        if ssl_context is not None:
+            self._ssl_context = ssl_context
+        elif config.certificate_path is not None and config.private_key_path is not None:
+            self._ssl_context = build_ssl_context(config.certificate_path, config.private_key_path)
+        else:
+            self._ssl_context = None
         self.query_service = QueryServiceImpl(
             registry=self.registry,
             connectors=self.connectors,
@@ -83,7 +101,7 @@ class CentralSystemApp:
         """
         if self._server is not None:
             raise RuntimeError("CentralSystemApp.start() wurde ohne vorheriges stop() erneut aufgerufen.")
-        self._server = await start_server(self.config, self._handler_services)
+        self._server = await start_server(self.config, self._handler_services, ssl_context=self._ssl_context)
 
     async def stop(self) -> None:
         """Close the listen socket, open connections and the console task. Idempotent.

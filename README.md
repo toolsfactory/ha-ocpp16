@@ -84,12 +84,15 @@ Follow the setup wizard:
 
 1. Enter the address and port the OCPP WebSocket server should listen on (defaults to
    `0.0.0.0:9000` - reachable from every network interface)
-2. Optionally point at a JSON file with a static idTag allow-list
-3. Optionally set a default idTag to use when starting a transaction from the `start_stop` switch
-4. Click Submit
+2. Optionally point at a PEM certificate/private key pair to accept `wss://` directly, with no
+   reverse proxy needed
+3. Optionally point at a JSON file with a static idTag allow-list
+4. Optionally set a default idTag to use when starting a transaction from the `start_stop` switch
+5. Click Submit
 
 Home Assistant now starts listening for charge point connections. Point your charge point's OCPP
-backend URL at `ws://<this host>:<port>/<chargePointId>`.
+backend URL at `ws://<this host>:<port>/<chargePointId>` — or `wss://` if you configured a
+certificate.
 
 #### Option 2: Manual Configuration
 
@@ -283,25 +286,28 @@ data:
 
 ### During Setup
 
-| Name               | Required | Description                                                                                                               |
-| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Host               | Yes      | Address the OCPP WebSocket server listens on (default `0.0.0.0`)                                                          |
-| Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)                                                                |
-| Authorization File | No       | Path to a JSON file with a static idTag allow-list. **Leaving this unset rejects every idTag**, not the other way around. |
-| Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command — must appear in the allow-list above                        |
-| Max Power Limit    | No       | Upper bound (in watts) for the **Power Limit** number entity — match your charge point's actual maximum (default `22000`) |
+| Name               | Required | Description                                                                                                                         |
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Host               | Yes      | Address the OCPP WebSocket server listens on (default `0.0.0.0`)                                                                    |
+| Port               | Yes      | Port the OCPP WebSocket server listens on (default `9000`)                                                                          |
+| Certificate Path   | No       | Path to a PEM TLS certificate. Set together with Private Key Path to accept `wss://` directly — leave both empty for plain `ws://`. |
+| Private Key Path   | No       | Path to the PEM private key matching the certificate above.                                                                         |
+| Authorization File | No       | Path to a JSON file with a static idTag allow-list. **Leaving this unset rejects every idTag**, not the other way around.           |
+| Default idTag      | No       | idTag used by the `start_stop` switch's remote-start command — must appear in the allow-list above                                  |
+| Max Power Limit    | No       | Upper bound (in watts) for the **Power Limit** number entity — match your charge point's actual maximum (default `22000`)           |
 
-Host and port are fixed once the entry is created (changing the listen address needs a new entry).
-Authorization File, Default idTag, and Max Power Limit can be changed afterwards via
-**Settings** → **Devices & Services** → **OCPP** → **Configure** — this reloads the entry to apply
-the change.
+Host, Port, Certificate Path, and Private Key Path can be changed after setup via **Settings** →
+**Devices & Services** → the specific "OCPP (host:port)" entry → **Reconfigure**. Authorization
+File, Default idTag, and Max Power Limit are changed separately via **Configure** instead — both
+paths reload the entry to apply the change.
 
 ## Troubleshooting
 
 ### Charge point does not appear
 
 - Confirm the charge point's configured OCPP backend URL matches
-  `ws://<host>:<port>/<chargePointId>` and uses subprotocol `ocpp1.6`
+  `ws://<host>:<port>/<chargePointId>` (or `wss://` if a certificate is configured) and uses
+  subprotocol `ocpp1.6`
 - Check that nothing else on the network is already bound to the configured port
 - Check the Home Assistant log for connection attempts and rejected connections
 

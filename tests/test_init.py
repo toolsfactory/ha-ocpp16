@@ -1,11 +1,12 @@
 """Tests for setup and unload of the ocpp integration."""
 
 from collections.abc import Callable
+from pathlib import Path
 from unittest.mock import patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import DOMAIN
+from custom_components.ocpp.const import CONF_CERTIFICATE_PATH, CONF_HOST, CONF_PORT, CONF_PRIVATE_KEY_PATH, DOMAIN
 from custom_components.ocpp.entity_utils.device import charge_point_identifier, connector_identifier
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -45,6 +46,31 @@ async def test_bind_failure_is_a_translated_config_entry_not_ready(
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
     assert mock_config_entry.error_reason_translation_key == "bind_failed"
+
+
+async def test_setup_wires_tls_certificate_into_app_config(
+    hass: HomeAssistant, mock_app_start_stop: None, tls_cert_pair: tuple[Path, Path]
+) -> None:
+    """A configured certificate/key pair (Phase 5) reaches `AppConfig`, and setup succeeds."""
+    cert_path, key_path = tls_cert_pair
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCPP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={
+            CONF_HOST: "0.0.0.0",
+            CONF_PORT: 9500,
+            CONF_CERTIFICATE_PATH: str(cert_path),
+            CONF_PRIVATE_KEY_PATH: str(key_path),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.app.config.certificate_path == cert_path
+    assert entry.runtime_data.app.config.private_key_path == key_path
 
 
 async def test_device_names_are_language_neutral(
