@@ -77,3 +77,6 @@ MEASURAND_POWER_ACTIVE_IMPORT = "Power.Active.Import"
 
 # -- Active-Phases-Sensor (kein Interop-Vertrag-Bestandteil) ----------------
 MEASURAND_CURRENT_IMPORT = "Current.Import"
+
+# -- Session-Energy-Sensor (kein Interop-Vertrag-Bestandteil) ---------------
+MEASURAND_ENERGY_ACTIVE_IMPORT_REGISTER = "Energy.Active.Import.Register"

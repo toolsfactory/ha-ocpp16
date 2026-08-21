@@ -5,20 +5,23 @@ from custom_components.ocpp.coordinator import OcppCoordinator
 from custom_components.ocpp.core.domain.commands import CommandError
 from custom_components.ocpp.runtime import OcppEntryData
 from custom_components.ocpp.utils import interop
-from homeassistant.components.number import NumberDeviceClass, NumberMode
+from homeassistant.components.number import NumberDeviceClass, NumberMode, RestoreNumber
 from homeassistant.const import UnitOfPower
 from homeassistant.exceptions import HomeAssistantError
 
 from ._base import _OcppConnectorNumberBase
 
 
-class OcppPowerLimitNumber(_OcppConnectorNumberBase):
+class OcppPowerLimitNumber(_OcppConnectorNumberBase, RestoreNumber):
     """Setzt/löscht die Leistungsgrenze über dieselben Fähigkeit-3/4-Funktionen wie die Services.
 
     ``native_value`` ist optimistisch (letzter erfolgreich gesetzter/gelöschter Wert), kein
     eigener ``GetCompositeSchedule``-Live-Refresh -- das bleibt Aufgabe des dedizierten
     ``effective_power_limit_w``-Sensors (mit dem Entwickler bestätigt: kein doppelter
-    Central-System-initiierter Traffic für dieselbe Information).
+    Central-System-initiierter Traffic für dieselbe Information). Über einen HA-Neustart hinweg
+    wird derselbe zuletzt gesetzte Wert per ``RestoreNumber`` wiederhergestellt statt erneut
+    ``unknown`` zu zeigen (Entscheidung 2026-08-21, siehe DECISIONS.md) -- das ist weiterhin nur
+    der zuletzt *gesetzte* Sollwert, keine erneute Bestätigung des tatsächlichen Ist-Zustands.
     """
 
     _attr_translation_key = "power_limit_w"
@@ -35,9 +38,16 @@ class OcppPowerLimitNumber(_OcppConnectorNumberBase):
         self._attr_native_max_value = entry_data.max_power_limit_w
         self._value: float | None = None
 
+    async def async_added_to_hass(self) -> None:
+        """Restore the last set value across a HA restart, if one was ever recorded."""
+        await super().async_added_to_hass()
+        last_data = await self.async_get_last_number_data()
+        if last_data is not None and last_data.native_value is not None:
+            self._value = last_data.native_value
+
     @property
     def native_value(self) -> float | None:
-        """Return the last successfully set/cleared power limit, or `None` if never set this session."""
+        """Return the last successfully set/cleared power limit, or `None` if never set."""
         return self._value
 
     async def async_set_native_value(self, value: float) -> None:

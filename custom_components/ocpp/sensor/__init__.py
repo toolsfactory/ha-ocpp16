@@ -17,7 +17,12 @@ from .charge_point_state import OcppChargePointStateSensor
 from .current_power import OcppCurrentPowerSensor
 from .effective_power_limit import OcppEffectivePowerLimitSensor
 from .last_heartbeat import OcppLastHeartbeatSensor
+from .last_stop_reason import OcppLastStopReasonSensor
+from .last_transaction_id import OcppLastTransactionIdSensor
 from .measurand import OcppMeasurandSensor
+from .reconnect_count import OcppReconnectCountSensor
+from .session_duration import OcppSessionDurationSensor
+from .session_energy import OcppSessionEnergySensor
 
 # Rein lesend -- jede Entity liest bei jedem Dispatcher-Ereignis ihren eigenen
 # Ausschnitt, kein eigener I/O-Aufruf (siehe Moduldocstring).
@@ -29,7 +34,12 @@ __all__ = [
     "OcppCurrentPowerSensor",
     "OcppEffectivePowerLimitSensor",
     "OcppLastHeartbeatSensor",
+    "OcppLastStopReasonSensor",
+    "OcppLastTransactionIdSensor",
     "OcppMeasurandSensor",
+    "OcppReconnectCountSensor",
+    "OcppSessionDurationSensor",
+    "OcppSessionEnergySensor",
     "async_setup_entry",
 ]
 
@@ -89,11 +99,21 @@ class _SensorManager:
             | OcppCurrentPowerSensor
             | OcppEffectivePowerLimitSensor
             | OcppLastHeartbeatSensor
+            | OcppLastStopReasonSensor
+            | OcppLastTransactionIdSensor
             | OcppMeasurandSensor
+            | OcppReconnectCountSensor
+            | OcppSessionDurationSensor
+            | OcppSessionEnergySensor
         ] = []
         if charge_point_id not in self._known_charge_points:
             self._known_charge_points.add(charge_point_id)
-            new_entities.append(OcppLastHeartbeatSensor(self.coordinator, self.entry_data, charge_point_id))
+            new_entities.extend(
+                [
+                    OcppLastHeartbeatSensor(self.coordinator, self.entry_data, charge_point_id),
+                    OcppReconnectCountSensor(self.coordinator, self.entry_data, charge_point_id),
+                ]
+            )
         for connector_id in connector_ids:
             if connector_id < 1:
                 continue  # ADR-0008: connectorId 0 hat kein eigenes Sub-Device.
@@ -106,6 +126,10 @@ class _SensorManager:
                         OcppCurrentPowerSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                         OcppEffectivePowerLimitSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                         OcppActivePhasesSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OcppLastTransactionIdSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OcppSessionDurationSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OcppSessionEnergySensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
+                        OcppLastStopReasonSensor(self.coordinator, self.entry_data, charge_point_id, connector_id),
                     ]
                 )
             new_entities.extend(self._new_measurand_sensors(charge_point_id, connector_id))

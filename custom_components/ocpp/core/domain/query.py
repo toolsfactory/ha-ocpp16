@@ -61,6 +61,10 @@ class QueryServiceImpl:
         """Return active transactions, optionally scoped to one charge point."""
         return self._transactions.get_active_transactions(charge_point_id)
 
+    def get_last_transaction(self, charge_point_id: str, connector_id: int) -> TransactionSnapshot | None:
+        """Return the connector's most recent transaction (active or stopped), or None if there never was one."""
+        return self._transactions.get_last_transaction(charge_point_id, connector_id)
+
     def subscribe(self, listener: StateChangeListener) -> Callable[[], None]:
         """Register `listener` on the event bus and return an unsubscribe callable."""
         return self._events.subscribe(listener)

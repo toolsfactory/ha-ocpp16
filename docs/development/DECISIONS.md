@@ -380,6 +380,38 @@ behavior; this entry is the decision record those pages were missing a link to.
 
 ---
 
+### `number.power_limit_w` restores its last value across a HA restart
+
+**Date:** 2026-08-21
+
+**Context:** The power-limit number entity's `native_value` is deliberately optimistic (documented
+in `number/power_limit.py`'s own docstring and `INTEROP_CONTRACT.md`) — it shows the last value
+successfully set this session, not a live `GetCompositeSchedule` read. Before this decision, a HA
+restart reset that in-memory value to `unknown` every time, even if a limit was actively in effect
+on the charge point. `COMPARISON_LBBRHZN_OCPP.md`'s Phase 4 flagged this as an open decision gate:
+is a possibly-stale restored value more useful than `unknown`, given the charge point could have
+had its limit changed outside of Home Assistant while it was down?
+
+**Decision:** Restore the last successfully set value via Home Assistant's built-in `RestoreNumber`
+mixin (`homeassistant.components.number.RestoreNumber`, `async_get_last_number_data()`), confirmed
+with the developer over the alternative of re-syncing via one `GetCompositeSchedule` call on first
+connect after restart.
+
+**Rationale:** `RestoreNumber` needs no new Central-System-initiated call — restoring from Home
+Assistant's own state history costs nothing and stays consistent with why the number entity is
+optimistic in the first place (avoid doubling `GetCompositeSchedule` traffic that the
+`effective_power_limit_w` sensor already covers). A live re-sync on every restart/reconnect would
+have reintroduced exactly that duplication for a value that's rarely stale in practice (power
+limits aren't usually changed outside Home Assistant).
+
+**Consequences:** After a restart, `number.power_limit_w` shows the last value _this integration_
+set, not necessarily the charge point's true current limit — `effective_power_limit_w` remains the
+only sensor that makes a live claim about the actual, currently-effective limit. No new tests
+needed for the "device changed it externally" case: that gap already existed and is unchanged by
+this decision, only the "unknown after every restart" annoyance is fixed.
+
+---
+
 ### Project identity renamed from OCCP to OCPP
 
 **Date:** 2026-08-20

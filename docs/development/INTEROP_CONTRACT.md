@@ -153,9 +153,20 @@ same is true of the `last_heartbeat` sensor (no REQ-0035 capability tracks heart
 `number.power_limit_w` is UI convenience over Fähigkeit 3/4 (`ocpp.set_power_limit`/
 `ocpp.clear_power_limit`), not a new capability of its own — it calls the same
 `utils/interop.py` functions the services do. Its `native_value` is optimistic (the last
-successfully set/cleared value this session), not a live re-read — a load-management integration
-that needs the charge point's actual current limit should keep using the `effective_power_limit_w`
-sensor (capability 5), not this entity's state.
+successfully set/cleared value this session, restored across a HA restart via `RestoreNumber` —
+see `DECISIONS.md`), not a live re-read — a load-management integration that needs the charge
+point's actual current limit should keep using the `effective_power_limit_w` sensor (capability
+5), not this entity's state.
+
+The five session/connection diagnostic sensors added 2026-08-21 are the same kind of convenience,
+not new capabilities: `last_transaction_id`, `session_duration_s`, and `session_energy_wh`
+(`sensor`, connector-scoped) reflect the connector's most recent transaction — active or already
+stopped — via the new `QueryService.get_last_transaction()` read path; `last_stop_reason`
+(`sensor`, connector-scoped) is the raw OCPP `Reason` string from that same transaction, not
+schema-restricted (real devices aren't always spec-perfect); `reconnect_count` (`sensor`,
+charge-point-scoped, `EntityCategory.DIAGNOSTIC`) counts WebSocket (re)connections since process
+start, including REQ-0001 AC4 takeovers. None of these are REQ-0035 capabilities and none carry a
+bitmask entry.
 
 ## Stability
 

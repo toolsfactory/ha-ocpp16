@@ -87,6 +87,21 @@
       },
       "last_heartbeat": {
         "name": "Last Heartbeat"
+      },
+      "last_transaction_id": {
+        "name": "Transaction ID"
+      },
+      "session_duration_s": {
+        "name": "Session Duration"
+      },
+      "session_energy_wh": {
+        "name": "Session Energy"
+      },
+      "last_stop_reason": {
+        "name": "Stop Reason"
+      },
+      "reconnect_count": {
+        "name": "Reconnect Count"
       }
     },
     "switch": {

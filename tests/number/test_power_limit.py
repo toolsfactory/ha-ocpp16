@@ -3,11 +3,11 @@
 from collections.abc import Callable
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, mock_restore_cache_with_extra_data
 
 from custom_components.ocpp.const import CONF_HOST, CONF_MAX_POWER_LIMIT_W, CONF_PORT, DOMAIN
 from custom_components.ocpp.entity_utils.device import connector_identifier
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
@@ -124,3 +124,40 @@ async def test_native_max_value_reflects_the_configured_option(
 
     state = hass.states.get(entity_id)
     assert state.attributes["max"] == 11000.0
+
+
+async def test_restores_the_last_set_value_across_a_restart(
+    hass: HomeAssistant,
+    mock_app_start_stop: None,
+    mock_config_entry: MockConfigEntry,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+    publish_state_change: Callable[..., None],
+) -> None:
+    """A HA restart restores the last successfully set value instead of showing `unknown` again."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State("number.connector_1_power_limit", "5000.0"),
+                {
+                    "native_max_value": 22000.0,
+                    "native_min_value": 0,
+                    "native_step": 1.0,
+                    "native_unit_of_measurement": "W",
+                    "native_value": 5000.0,
+                },
+            )
+        ],
+    )
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    entry_data = mock_config_entry.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    publish_state_change(entry_data.app, connector_id=None)
+    await hass.async_block_till_done()
+
+    entity_id = _get_entity_id(hass, mock_config_entry.entry_id)
+    assert hass.states.get(entity_id).state == "5000.0"

@@ -46,6 +46,10 @@ class TransactionManager:
         """Initialize with no recorded transactions."""
         self._records: dict[int, _TransactionRecord] = {}
         self._active_by_connector: dict[tuple[str, int], int] = {}
+        # Anders als `_active_by_connector` (bei `stop_transaction` gelöscht) bleibt dieser Eintrag
+        # nach dem Ende einer Transaktion bestehen -- `get_last_transaction` braucht ihn, um die
+        # zuletzt (aktive oder beendete) Transaktion je Connector zu finden.
+        self._last_by_connector: dict[tuple[str, int], int] = {}
         self._id_generator = itertools.count(1)
 
     def start_transaction(
@@ -69,6 +73,7 @@ class TransactionManager:
         )
         self._records[transaction_id] = record
         self._active_by_connector[(charge_point_id, connector_id)] = transaction_id
+        self._last_by_connector[(charge_point_id, connector_id)] = transaction_id
         return record.to_snapshot()
 
     def stop_transaction(
@@ -119,3 +124,10 @@ class TransactionManager:
         """Return whether the transaction exists and has not been stopped."""
         record = self._records.get(transaction_id)
         return record is not None and record.stopped_at is None
+
+    def get_last_transaction(self, charge_point_id: str, connector_id: int) -> TransactionSnapshot | None:
+        """Return the most recent transaction (active or stopped) on the connector, or `None` if there never was one."""
+        transaction_id = self._last_by_connector.get((charge_point_id, connector_id))
+        if transaction_id is None:
+            return None
+        return self._records[transaction_id].to_snapshot()

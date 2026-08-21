@@ -16,6 +16,21 @@
       },
       "last_heartbeat": {
         "default": "mdi:heart-pulse"
+      },
+      "last_transaction_id": {
+        "default": "mdi:identifier"
+      },
+      "session_duration_s": {
+        "default": "mdi:timer-outline"
+      },
+      "session_energy_wh": {
+        "default": "mdi:lightning-bolt"
+      },
+      "last_stop_reason": {
+        "default": "mdi:stop-circle-outline"
+      },
+      "reconnect_count": {
+        "default": "mdi:refresh"
       }
     },
     "switch": {

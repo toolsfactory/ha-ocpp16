@@ -41,6 +41,7 @@ class ChargePointSnapshot:
     vendor: str | None
     model: str | None
     firmware_version: str | None
+    reconnect_count: int
 
 
 class ChargePointRegistry(Protocol):
@@ -121,6 +122,17 @@ class QueryService(Protocol):
 
     def get_active_transactions(self, charge_point_id: str | None = None) -> Sequence[TransactionSnapshot]:
         """Return active transactions, optionally scoped to one charge point."""
+        ...
+
+    def get_last_transaction(self, charge_point_id: str, connector_id: int) -> TransactionSnapshot | None:
+        """Die zuletzt (aktive oder beendete) Transaktion eines Connectors, oder ``None`` falls nie eine stattfand.
+
+        Additiv wie ``get_connectors``/``get_meter_samples`` unten -- REQ-0011/REQ-0032 verlangten ursprünglich nur
+        ``get_active_transactions``; für Sitzungsdiagnostik (Transaktions-ID/Dauer/Energie/Stop-Grund auch nach
+        Sessionende, seit 2026-08-21) reicht das nicht. Wie bei ``INTEROP_CONTRACT.md``'s eigener Provenance-Notiz
+        gibt es keine lokale ``interfaces.md``/ADR-0003-Quelle in diesem Repository, die diese Erweiterung formal
+        fortschreiben könnte -- dieser Docstring ist der Verweis darauf, nicht ein Ersatz dafür.
+        """
         ...
 
     def get_meter_samples(

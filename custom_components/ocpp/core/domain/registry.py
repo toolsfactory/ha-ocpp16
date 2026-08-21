@@ -24,6 +24,7 @@ class _ChargePointRecord:
     vendor: str | None = None
     model: str | None = None
     firmware_version: str | None = None
+    reconnect_count: int = 0
 
     def to_snapshot(self) -> ChargePointSnapshot:
         return ChargePointSnapshot(
@@ -34,6 +35,7 @@ class _ChargePointRecord:
             vendor=self.vendor,
             model=self.model,
             firmware_version=self.firmware_version,
+            reconnect_count=self.reconnect_count,
         )
 
 
@@ -64,7 +66,11 @@ class ChargePointRegistryStore:
             )
             self._records[charge_point_id] = record
         else:
+            # Nicht die erste Verbindung dieses Charge Points -- zaehlt als Reconnect,
+            # unabhaengig davon, ob es ein sauberer Reconnect oder eine Uebernahme
+            # (REQ-0001 AC4, `previous is not None`) ist.
             record.connection_status = ConnectionStatus.ONLINE
+            record.reconnect_count += 1
         return previous
 
     def mark_boot(

@@ -371,5 +371,6 @@ If configuration changes aren't persisted:
 
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
 - [Examples](./EXAMPLES.md) - Automation and dashboard examples
+- [Supported Devices](./SUPPORTED_DEVICES.md) - Real-hardware compatibility results (currently empty — no device validated yet)
 - [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
 - [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues) - Report problems

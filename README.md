@@ -129,6 +129,13 @@ instead, noted below.
   reports one
 - **Last Heartbeat** (charge-point-wide): Timestamp of the charge point's most recent OCPP
   `Heartbeat.req`
+- **Transaction ID**: The connector's most recent transaction ID, active or already stopped
+- **Session Duration**: How long the connector's most recent session has been (or was) running
+- **Session Energy**: Energy delivered during the connector's most recent session, in Wh
+- **Stop Reason**: The OCPP `Reason` for the connector's most recently stopped session, `unknown`
+  while a session is active or none has run yet
+- **Reconnect Count** (charge-point-wide, diagnostic): How many times this charge point has
+  (re)connected since Home Assistant started, including automatic takeovers of a stale connection
 
 ### Switches
 
@@ -149,7 +156,8 @@ instead, noted below.
   Dashboard-idiomatic alternative to the `ocpp.set_power_limit`/`ocpp.clear_power_limit` services,
   calling the same underlying command. Its value is optimistic (the last value you successfully
   set), not a live read of the charge point's actual limit — use the **Effective Power Limit**
-  sensor for that. Its maximum is the **Max Power Limit** setup option, not a fixed value.
+  sensor for that. Its maximum is the **Max Power Limit** setup option, not a fixed value. It
+  restores its last value across a Home Assistant restart instead of showing `unknown` again.
 
 ## Custom Services
 

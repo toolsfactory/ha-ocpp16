@@ -1,6 +1,7 @@
 """Tests for `diagnostics.py` (Quality Scale rule `diagnostics`)."""
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -46,9 +47,51 @@ async def test_diagnostics_redacts_sensitive_fields(
     charge_point = diagnostics["charge_points"][0]
     assert charge_point["charge_point_id"] == CHARGE_POINT_ID
     assert charge_point["vendor"] == "Test-Vendor"
+    assert charge_point["reconnect_count"] == 0
     # boot_charge_point registers connector 0 (charge-point-wide) plus connector 1.
     assert len(charge_point["connectors"]) == 2
     assert all(connector["status"] == "Available" for connector in charge_point["connectors"])
+    assert all(connector["last_transaction"] is None for connector in charge_point["connectors"])
+
+
+async def test_diagnostics_includes_reconnect_count_and_redacts_transaction_id_tag(
+    hass: HomeAssistant,
+    mock_app_start_stop: None,
+    mock_charge_point_connection,
+    boot_charge_point: Callable[..., None],
+) -> None:
+    """`reconnect_count` reflects a second connection; a transaction's `id_tag` is redacted too."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OCPP (0.0.0.0:9500)",
+        unique_id="existing-uuid",
+        data={CONF_HOST: "0.0.0.0", CONF_PORT: 9500},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    entry_data = entry.runtime_data
+    boot_charge_point(entry_data.app, mock_charge_point_connection)
+    entry_data.app.registry.register_connection(CHARGE_POINT_ID, mock_charge_point_connection)
+    transaction = entry_data.app.transactions.start_transaction(
+        charge_point_id=CHARGE_POINT_ID,
+        connector_id=1,
+        id_tag="SECRET-TAG",
+        meter_start_wh=0,
+        started_at=datetime.now(UTC),
+    )
+    entry_data.app.transactions.stop_transaction(
+        transaction.transaction_id, meter_stop_wh=500, stopped_at=datetime.now(UTC), reason="Local"
+    )
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+
+    charge_point = diagnostics["charge_points"][0]
+    assert charge_point["reconnect_count"] == 1
+    connector_1 = next(c for c in charge_point["connectors"] if c["connector_id"] == 1)
+    assert connector_1["last_transaction"]["transaction_id"] == transaction.transaction_id
+    assert connector_1["last_transaction"]["id_tag"] == REDACTED
+    assert connector_1["last_transaction"]["stop_reason"] == "Local"
 
 
 async def test_diagnostics_with_no_connected_charge_points(
