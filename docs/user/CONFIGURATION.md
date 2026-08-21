@@ -43,17 +43,21 @@ file listing at least the `Default idTag` if you want the `start_stop` switch or
 
 ### Options Flow
 
-The **Authorization File** and **Default idTag** can be changed after setup, without recreating
-the integration — the entry reloads automatically to apply the change:
+The **Authorization File**, **Default idTag**, and **Max Power Limit** can all be changed after
+setup, without recreating the integration — the entry reloads automatically to apply the change:
 
 1. Go to **Settings** → **Devices & Services**
 2. Find "OCPP 1.6 Central System"
 3. Click **Configure**
-4. Modify the authorization file path or default idTag
+4. Modify the authorization file path, default idTag, or max power limit
 5. Click **Submit**
 
 Setting a **Default idTag** requires an authorization file that actually accepts it — an unknown,
 blocked, or expired idTag is rejected at this step rather than saved and failing later.
+
+Changing **Max Power Limit** updates every connector's `number.power_limit_w` entity's maximum
+value immediately — it does not itself change any charge point's actual power limit, only what the
+number entity will let you set.
 
 ### Reconfigure Flow (Host/Port)
 
@@ -108,7 +112,7 @@ Disabled entities won't update or consume resources.
 
 ## Services
 
-The integration provides 7 services. `device_id` fields expect the connector or charge-point
+The integration provides 9 services. `device_id` fields expect the connector or charge-point
 device (as noted per service) — resolve it via **Settings** → **Devices & Services** → the device,
 or the device selector Home Assistant's service UI offers for these fields automatically. See
 [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) for the full machine-readable contract
@@ -292,9 +296,16 @@ configure and nothing to tune for responsiveness.
 
 ## Diagnostic Data
 
-Not yet implemented — this integration does not currently provide a "Download Diagnostics" export.
-Use debug logging (see [GETTING_STARTED.md](./GETTING_STARTED.md#debug-logging)) for
-troubleshooting in the meantime.
+**Settings** → **Devices & Services** → **OCPP 1.6 Central System** → the three-dot menu →
+**Download Diagnostics** exports a summary of what OCPP currently knows about the config entry and
+each connected charge point: entry configuration, per-charge-point connection status,
+vendor/model/firmware, and per-connector status/error code. Host, the authorization file path, and
+the default idTag are redacted; `charge_point_id` is deliberately not (it is already visible
+everywhere in the UI as the device name — see
+[DECISIONS.md](../development/DECISIONS.md#accepted-risk-charge_point_id-is-not-redacted-in-diagnostics)).
+This is a point-in-time summary, not a full OCPP frame log — use debug logging (see
+[GETTING_STARTED.md](./GETTING_STARTED.md#debug-logging)) for detailed protocol-level
+troubleshooting.
 
 ## Blueprints
 

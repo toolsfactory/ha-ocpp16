@@ -351,6 +351,35 @@ checked for a raised error to detect failure needs no changes at all.
 
 ---
 
+### `ocpp.trigger_message` returns `Rejected`/`NotImplemented` as data, not an exception
+
+**Date:** 2026-08-20
+
+**Context:** `ocpp.trigger_message` (OCPP `TriggerMessage.req`) is not a REQ-0035 contract
+capability — it was added alongside the heartbeat sensor and reset/unlock buttons as a separate
+scope decision (see "Expose Reset/UnlockConnector/GetConfiguration/ChangeConfiguration as HA
+services" above). Confirmed with the maintainer before implementation: unlike `set_power_limit`/
+`clear_power_limit`/`reset`/`unlock_connector`/`change_configuration`, its status is returned as
+normal response data (`{"status": "Accepted"|"Rejected"|"NotImplemented"}`) even when not
+`"Accepted"`, rather than raising `ServiceValidationError`. A subsequent QUALITY_REVIEW.md pass
+flagged this as inconsistent with every other mutating service and with the Silver Quality Scale
+rule `action-exceptions` — correctly noting that the decision itself was never recorded here, only
+in the plan file and the code's own docstrings.
+
+**Decision:** Kept as data-return, not changed to raise. `trigger_message` does not change any
+charge-point state the way `reset`/`unlock_connector`/`set_power_limit` do — it only asks the
+charge point to resend a message it may not support. A `"Rejected"`/`"NotImplemented"` reply is
+informative ("this charge point doesn't support triggering that message"), not a failed mutation,
+so treating it as an exception would misrepresent a successful, informative round trip as an error.
+
+**Consequences:** `action-exceptions` is a deliberate, documented deviation for this one service,
+not a gap to close — an automation that only checks for a raised error to detect "did the trigger
+work" must inspect the returned `status` instead. `INTEROP_CONTRACT.md`'s "outside this contract"
+section and `docs/user/CONFIGURATION.md`/`README.md`'s service descriptions already document this
+behavior; this entry is the decision record those pages were missing a link to.
+
+---
+
 ### Project identity renamed from OCCP to OCPP
 
 **Date:** 2026-08-20
@@ -451,16 +480,24 @@ or grant that access.
 
 ### Brand assets
 
-**Status:** Local assets provided; external submission still outstanding
+**Status:** Local assets satisfy the Quality Scale rule; external HACS registration still outstanding
 
 The developer provided a full local brand asset set (`custom_components/ocpp/brand/`:
 `icon`/`logo`/`dark_icon`/`dark_logo`, each with an `@2x` variant) during the 2026-08-20 rename
 session — `homeassistant.loader.Integration.has_branding` recognizes a local `brand/` folder shipped
-inside the integration itself. What's still outstanding is unrelated to whether the local files
-exist: the Quality Scale `brands` rule (and HACS's own validator, per the `ignore: brands` entry
-still present in `.github/workflows/validate.yml`) additionally expects registration with the
-external `home-assistant/brands` repository — a PR against an Open Home Foundation repo, which this
-project's own AI policy (`AGENTS.md`) forbids an agent from opening. That submission, and removing
+inside the integration itself. **These two things are separate and must not be conflated (a prior
+version of this entry did):**
+
+- The Quality Scale `brands` rule is evaluated against `Integration.has_branding` — the local
+  assets alone already satisfy it. Nothing further is needed for `brands` to be `pass`.
+- HACS's own, unrelated `brands` validator (`config/custom_components/hacs/validate/brands.py`,
+  confirmed by reading its source) queries the external `https://brands.home-assistant.io/domains.json`
+  live registry, which only `home-assistant/brands` PRs update — this is a HACS distribution
+  requirement, not a Quality Scale one. `.github/workflows/validate.yml`'s `ignore: brands` line
+  works around exactly this gap, and stays in place until that external PR lands.
+
+Submitting to `home-assistant/brands` is a PR against an Open Home Foundation repo, which this
+project's own AI policy (`AGENTS.md`) forbids an agent from opening — that submission, and removing
 the `ignore: brands` line once it's accepted, remain the developer's to do.
 `docs-removal-instructions` (the other half of the original QUALITY_REVIEW.md finding this entry
 was created for) was addressed separately in `GETTING_STARTED.md`.

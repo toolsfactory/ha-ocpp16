@@ -65,8 +65,11 @@ something else is rejected immediately with a clear error rather than failing la
 - **Default idTag:** The idTag OCPP uses when the `start_stop` switch remote-starts a transaction.
   Required only if you plan to use that switch — and must appear in the authorization file above,
   or the charge point will reject the transaction as unauthorized.
+- **Max Power Limit:** Upper bound (in watts) for the **Power Limit** number entity — defaults to
+  `22000`. Set this to your charge point's actual maximum (e.g. `11000` for an 11 kW connection) so
+  the number entity's slider/box can't be set above what your hardware supports.
 
-Both of these can be changed later without recreating the integration — see
+All three of these can be changed later without recreating the integration — see
 [CONFIGURATION.md](./CONFIGURATION.md).
 
 Click **Submit** to complete setup. Home Assistant now starts listening for charge point
