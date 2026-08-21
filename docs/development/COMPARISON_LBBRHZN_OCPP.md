@@ -93,9 +93,12 @@ umgesetzt, siehe Phase 5).
 
 ## Explizite Handlungsempfehlungen für Phasen 0 bis 4
 
-| Priorität | Phase | Handlung                                                                                                                                                                                 | Abnahme                                                                                                                                                              |
-| --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1        | 1     | Aussagekräftige Tests bis mindestens 90 Prozent Coverage ergänzen. Anschließend `script/type-check`, `script/test --cov` und `fail_under = 90` als verpflichtende CI-Grenzen einrichten. | Ein absichtlicher Typfehler, ein fehlschlagender Test und eine Coverage unter 90 Prozent lassen die jeweiligen CI-Jobs fehlschlagen; nach Rücknahme ist die CI grün. |
+| Priorität | Phase | Handlung                                                                                                                                                   | Abnahme                                                                                                             |
+| --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| P1        | 1     | Den vorbereiteten `type-check-and-test`-Job in `.github/workflows/lint.yml` einfügen (Maintainer -- Agent-Umgebungen können diese Datei nicht bearbeiten). | Ein absichtlicher Typfehler und ein fehlschlagender Test lassen den Job rot werden; nach Rücknahme ist die CI grün. |
+
+Coverage-Tests und der lokal erzwungene `fail_under = 90` sind bereits erledigt (siehe Status oben);
+nur das Einfügen des Workflow-Jobs selbst bleibt offen.
 
 Für **Phase 0** besteht kein weiterer Nachbesserungsbedarf: Die Vertrags- und
 Dokumentationslücken wurden mit Commit `26e9a17` geschlossen; das besondere Ergebnisverhalten von
@@ -156,7 +159,64 @@ und mit einem absichtlichen Typ- und Testfehler verifizieren.
 - **Verifikation:** Ein absichtlich fehlschlagender Test und ein Typfehler müssen die jeweiligen Jobs lokal oder auf
   einem Testbranch rot machen; danach Teständerungen zurücknehmen.
 - **Unabhängig auslieferbar:** ja.
-- **Entscheidungstor:** Wer darf Workflowdateien ändern? (Coverage-Grenzwert ist entschieden: 90 Prozent.)
+- **Entscheidungstor:** aufgelöst -- Coverage-Grenzwert ist entschieden (90 Prozent) und lokal
+  erzwungen; offen ist nur noch, wer/wann den folgenden Job einfügt.
+
+**Fertiger Job-Ausschnitt für `.github/workflows/lint.yml`** (unter dem bestehenden `ruff`-Job
+einfügen, dieselben Setup-Schritte):
+
+```yaml
+type-check-and-test:
+  name: "Type check and test"
+  runs-on: "ubuntu-latest"
+  permissions:
+    contents: read # check out the repository
+  steps:
+    - name: Checkout the repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.14"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      with:
+        version: "0.9.3"
+        enable-cache: true
+        cache-dependency-glob: "**/requirements*.txt"
+
+    - name: Get Home Assistant version
+      id: ha_version
+      run: |
+        HA_VERSION=$(grep '"homeassistant"' hacs.json | head -1 | sed 's/.*"homeassistant"\s*:\s*"\([^"]*\)".*/\1/')
+        echo "HA_VERSION=${HA_VERSION}" >> $GITHUB_OUTPUT
+        echo "Home Assistant version: ${HA_VERSION}"
+
+    - name: Cache Home Assistant installation
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          .local/ha-venv
+        key: ha-venv-${{ runner.os }}-py314-ha${{ steps.ha_version.outputs.HA_VERSION }}-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ha-venv-${{ runner.os }}-py314-ha${{ steps.ha_version.outputs.HA_VERSION }}-
+          ha-venv-${{ runner.os }}-py314-
+
+    - name: Install requirements
+      run: script/setup/bootstrap
+
+    - name: Type check
+      run: script/type-check
+
+    # fail_under = 90 in pyproject.toml's [tool.coverage.report] is what actually enforces the
+    # gate; --cov here only turns coverage measurement on for this run.
+    - name: Test with coverage
+      run: script/test --cov
+```
 
 ### Phase 2 – Reale Hardwarevalidierung und Kompatibilitätsmatrix
 
