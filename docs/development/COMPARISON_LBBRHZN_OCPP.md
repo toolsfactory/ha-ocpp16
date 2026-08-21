@@ -129,18 +129,23 @@ der vorherigen voraus.
 
 ### Phase 1 – CI als verbindliche Qualitätsgrenze etablieren
 
-**Status: Coverage-Ziel erreicht, CI-Gate noch offen (2026-08-21).** Die lokal gemessene Coverage
-liegt jetzt bei 93 Prozent (vorher 78 Prozent) -- über dem beschlossenen Ziel von 90 Prozent.
-Erreicht durch gezielte Tests der bis dahin ungedeckten Kernmodule: `core/config.py` (53% -> 100%),
-`core/__main__.py` (0% -> 94%), `core/ocpp16/handlers.py` (38% -> 100%, vorher hatte kein Test je
-`ChargePointHandler` instanziiert), `core/console.py` (0% -> 100%) und `core/transport.py`
-(41% -> 100%, inklusive eines echten `wss://`-Handshakes -- schließt zugleich Phase 5s offene
-Live-Verifikationslücke). Der bestehende Workflow führt weiterhin nur `script/lint-check` aus;
-`script/type-check`, `script/test --cov` und ein erzwungener Coverage-Grenzwert fehlen dort noch.
+**Status: Coverage-Ziel erreicht und lokal erzwungen, Workflow-Job noch offen (2026-08-21).** Die
+lokal gemessene Coverage liegt jetzt bei 93 Prozent (vorher 78 Prozent) -- über dem beschlossenen
+Ziel von 90 Prozent. Erreicht durch gezielte Tests der bis dahin ungedeckten Kernmodule:
+`core/config.py` (53% -> 100%), `core/__main__.py` (0% -> 94%), `core/ocpp16/handlers.py`
+(38% -> 100%, vorher hatte kein Test je `ChargePointHandler` instanziiert), `core/console.py`
+(0% -> 100%) und `core/transport.py` (41% -> 100%, inklusive eines echten `wss://`-Handshakes --
+schließt zugleich Phase 5s offene Live-Verifikationslücke). `pyproject.toml`s
+`[tool.coverage.report]` erzwingt `fail_under = 90` bereits jetzt -- jeder lokale
+`script/test --cov`-Lauf schlägt unterhalb der Grenze fehl, verifiziert mit einem probeweise auf
+99 Prozent gesetzten Wert. Nur der Workflow-Job selbst fehlt noch: Bearbeiten von
+`.github/workflows/*.yml` ist in dieser Agent-Umgebung durch eine Berechtigungseinstellung
+blockiert (Versuch am 2026-08-21 bestätigt) -- der fertige Job-Ausschnitt liegt bereit, der
+Maintainer muss ihn selbst einfügen.
 
-**Empfehlung:** Typprüfung, Tests und `fail_under = 90` gemeinsam als verpflichtende CI-Grenze
-aktivieren und mit einem absichtlichen Typ- und Testfehler verifizieren -- die Coverage-Arbeit
-selbst ist nicht mehr blockierend, nur noch das Verdrahten des CI-Gates.
+**Empfehlung:** Den vorbereiteten `type-check-and-test`-Job (Typprüfung + `script/test --cov`,
+dieselben Setup-Schritte wie der bestehende `ruff`-Job) in `.github/workflows/lint.yml` einfügen
+und mit einem absichtlichen Typ- und Testfehler verifizieren.
 
 - **Ziel:** Kein Typ- oder Testfehler kann mit grüner CI zusammengeführt werden.
 - **Dateien:** `.github/workflows/lint.yml` oder neue fokussierte Workflows, gegebenenfalls `pyproject.toml` und
@@ -306,9 +311,10 @@ kein HTTP-Client ist, der Host-basiertes Routing versteht.
 Phase 0 (Vertrags-/Dokumentationslücken) wurde am 2026-08-21 vollständig umgesetzt (Commit `26e9a17`) und ist aus
 diesem Plan entfernt.
 
-1. Phase 1: CI-Coverage-Grenzwert auf 90 Prozent festgelegt (2026-08-21), Coverage-Arbeit
-   abgeschlossen (78% -> 93%, 2026-08-21); nur das CI-Gate selbst (`.github/workflows/lint.yml`)
-   hängt noch an Workflow-Schreibrechten.
+1. Phase 1: CI-Coverage-Grenzwert auf 90 Prozent festgelegt und in `pyproject.toml` lokal erzwungen
+   (2026-08-21), Coverage-Arbeit abgeschlossen (78% -> 93%, 2026-08-21); nur der Workflow-Job selbst
+   (`.github/workflows/lint.yml`) fehlt noch -- fertig vorbereitet, Einfügen durch den Maintainer
+   nötig (Agent-Umgebung kann `.github/workflows/` nicht selbst bearbeiten).
 2. Phase 2 ist pausiert, bis reale Geräte verfügbar sind — nur die Struktur (`SUPPORTED_DEVICES.md`-Gerüst) wurde
    vorbereitet, keine Geräteeinträge.
 3. Phase 3 umgesetzt (2026-08-21).
@@ -323,8 +329,10 @@ diesem Plan entfernt.
 
 - **Reale Hardware fehlt:** Phase 2 ist deshalb bewusst pausiert (2026-08-21) — kommt mit der Zeit, sobald Geräte
   verfügbar sind; blockiert belastbare Kompatibilitätsaussagen, nicht die übrigen Phasen.
-- **Workflowberechtigung:** Der Maintainer klärt Schreibzugriff auf `.github/workflows/`; blockiert Phase 1
-  (Coverage-Grenzwert selbst ist mit 90 Prozent bereits entschieden).
+- **Workflowberechtigung:** Bestätigt blockiert (2026-08-21) -- Agent-Umgebungen können
+  `.github/workflows/*.yml` nicht bearbeiten. Coverage-Grenzwert (90 Prozent) und -Arbeit sind
+  bereits erledigt; nur das Einfügen des vorbereiteten `type-check-and-test`-Jobs bleibt am
+  Maintainer hängen.
 - **Stale Devices:** Die bestehende Entscheidung zu manueller oder zeitbasierter Entfernung bleibt offen und ist
   unabhängig von diesem Vergleich.
 - **Erweiterte Operationen:** Konkrete Geräte- oder Nutzeranforderungen entscheiden den Umfang; blockiert Phase 6.

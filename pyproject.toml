@@ -61,6 +61,9 @@ source = ["custom_components/ocpp"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
+# Decision 2026-08-21 (see docs/development/COMPARISON_LBBRHZN_OCPP.md, Phase 1): 90%, not
+# lbbrhzn/ocpp's unsubstantiated 95% figure. Increase-only -- never lower this to make a drop pass.
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
