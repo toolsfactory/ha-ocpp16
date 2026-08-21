@@ -132,13 +132,18 @@ instead, noted below.
   reports one
 - **Last Heartbeat** (charge-point-wide): Timestamp of the charge point's most recent OCPP
   `Heartbeat.req`
-- **Transaction ID**: The connector's most recent transaction ID, active or already stopped
-- **Session Duration**: How long the connector's most recent session has been (or was) running
-- **Session Energy**: Energy delivered during the connector's most recent session, in Wh
+- **Transaction ID**: The connector's most recent transaction ID, active or already stopped.
+  Restores its last known value across a Home Assistant restart until a new transaction happens
+- **Session Duration**: How long the connector's most recent session has been (or was) running.
+  Restores its last known value across a restart; a session still active at restart time stays
+  frozen at that value until the next transaction
+- **Session Energy**: Energy delivered during the connector's most recent session, in Wh. Restores
+  the same way as Session Duration
 - **Stop Reason**: The OCPP `Reason` for the connector's most recently stopped session, `unknown`
-  while a session is active or none has run yet
+  while a session is active or none has run yet. Restores its last known value across a restart
 - **Reconnect Count** (charge-point-wide, diagnostic): How many times this charge point has
-  (re)connected since Home Assistant started, including automatic takeovers of a stale connection
+  (re)connected, including automatic takeovers of a stale connection. Counts across Home Assistant
+  restarts too, not just since the current process started
 
 ### Switches
 

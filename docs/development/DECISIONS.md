@@ -500,6 +500,54 @@ the cheapest this will ever be.
 
 ---
 
+### Phase-3 diagnostic sensors restore across a HA restart, via entity-scoped `RestoreSensor`
+
+**Date:** 2026-08-21
+
+**Context:** `last_transaction_id`, `session_duration_s`, `session_energy_wh`, `last_stop_reason`,
+and `reconnect_count` (added in Phase 3, see `COMPARISON_LBBRHZN_OCPP.md`) all read from the
+in-memory domain layer (`TransactionManager`/`ChargePointRegistryStore`), which has never persisted
+anything across a restart and still doesn't. The 2026-08-21 recheck flagged this as an explicit,
+undecided gate rather than assuming the reset-to-`unknown` behavior was acceptable by default.
+
+**Decision:** Restore each sensor's last known value via
+`homeassistant.components.sensor.RestoreSensor` (the sensor-platform sibling of
+`RestoreNumber`, already used by `number.power_limit_w` — see the restore entry above), entirely
+at the entity layer. No change to `TransactionManager`/`ChargePointRegistryStore`/
+`CentralSystemApp` — none of the three needed a seam for injecting prior state, because every one
+of these 5 values is already exposed through exactly one live read path
+(`QueryService.get_last_transaction()` for the 4 connector sensors,
+`QueryService.get_charge_points()[...].reconnect_count` for the charge-point one).
+
+**Rationale:**
+
+- Four of the five (`last_transaction_id`/`session_duration_s`/`session_energy_wh`/
+  `last_stop_reason`) represent a point-in-time transaction snapshot: `native_value` falls back to
+  the restored value only while `get_last_transaction()` returns `None` (nothing registered yet
+  this process). The moment a real transaction happens post-restart, live data wins automatically —
+  the same "last known, not live-guaranteed" honesty already established for `power_limit_w`.
+- `reconnect_count` is a counter, not a snapshot: the live per-process count always restarts at `0`,
+  so a plain fallback would silently drop everything accumulated in earlier runs the first time this
+  process sees a reconnect. Instead it's additive — restored base + live per-process count — so a
+  reconnect during this run adds to history instead of replacing it.
+- A domain-layer persistence seam (making `TransactionManager`/`ChargePointRegistryStore` accept
+  seed state at construction) was considered and rejected: it would duplicate what HA's own
+  restore-state mechanism already does, for no benefit, since every value only ever needs
+  restoring at the one entity that displays it.
+
+**Consequences:**
+
+- If a transaction is still active exactly when HA restarts (the charge point never resends
+  `StartTransaction` for an already-active session), the connector sensors freeze at their
+  pre-restart snapshot until the next real transaction — `session_duration_s` will not keep
+  counting up during that gap. This is a real, accepted limitation of not tracking an active OCPP
+  session across a restart at all, not something this decision introduces.
+- `core/domain/transactions.py`'s module docstring is updated to clarify that the domain layer's
+  own "no persistence" stance is unchanged — only the entities gained independent, HA-native
+  restore, the same layering `power_limit_w` already established.
+
+---
+
 ## Future Considerations
 
 ### State Restoration

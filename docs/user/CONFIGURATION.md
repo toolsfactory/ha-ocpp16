@@ -324,10 +324,11 @@ configure and nothing to tune for responsiveness.
 
 **Settings** → **Devices & Services** → **OCPP 1.6 Central System** → the three-dot menu →
 **Download Diagnostics** exports a summary of what OCPP currently knows about the config entry and
-each connected charge point: entry configuration, per-charge-point connection status,
-vendor/model/firmware, and per-connector status/error code. Host, the authorization file path, and
-the default idTag are redacted; `charge_point_id` is deliberately not (it is already visible
-everywhere in the UI as the device name — see
+each connected charge point: entry configuration, per-charge-point connection status and reconnect
+count, vendor/model/firmware, and per-connector status, error code, and most recent transaction
+(transaction ID, start/stop time, stop reason). Host, the authorization file path, the default
+idTag, and a transaction's idTag are redacted; `charge_point_id` is deliberately not (it is already
+visible everywhere in the UI as the device name — see
 [DECISIONS.md](../development/DECISIONS.md#accepted-risk-charge_point_id-is-not-redacted-in-diagnostics)).
 This is a point-in-time summary, not a full OCPP frame log — use debug logging (see
 [GETTING_STARTED.md](./GETTING_STARTED.md#debug-logging)) for detailed protocol-level

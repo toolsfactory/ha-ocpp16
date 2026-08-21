@@ -91,6 +91,37 @@ umgesetzt, siehe Phase 5).
   [Issue](https://github.com/lbbrhzn/ocpp/issues/2008) zeigt, dass falsche Versionszuordnung einen Ladepunkt vollständig
   unbenutzbar machen kann.
 
+## Explizite Handlungsempfehlungen für Phasen 0 bis 4
+
+| Priorität | Phase | Handlung                                                                                                                                                                                 | Abnahme                                                                                                                                                              |
+| --------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1        | 1     | Aussagekräftige Tests bis mindestens 90 Prozent Coverage ergänzen. Anschließend `script/type-check`, `script/test --cov` und `fail_under = 90` als verpflichtende CI-Grenzen einrichten. | Ein absichtlicher Typfehler, ein fehlschlagender Test und eine Coverage unter 90 Prozent lassen die jeweiligen CI-Jobs fehlschlagen; nach Rücknahme ist die CI grün. |
+
+Für **Phase 0** besteht kein weiterer Nachbesserungsbedarf: Die Vertrags- und
+Dokumentationslücken wurden mit Commit `26e9a17` geschlossen; das besondere Ergebnisverhalten von
+`trigger_message` ist eine dokumentierte Produktentscheidung. **Phase 4** ist ebenfalls
+abgeschlossen: Restore, Clear auf `0`, Ablehnung und die Trennung zwischen optimistischem Sollwert
+und tatsächlich wirksamem Wert sind automatisiert abgedeckt.
+
+Der P2/Phase-3-Punkt (Restart-Verhalten von Sitzungsdiagnostik und Reconnect-Zähler entscheiden und
+absichern) ist ebenfalls erledigt: entschieden wurde **Persistenz** (2026-08-21, siehe
+`DECISIONS.md` "Phase-3 diagnostic sensors restore across a HA restart"), umgesetzt über
+`homeassistant.components.sensor.RestoreSensor` an allen fünf Sensoren, automatisiert getestet
+(je ein Restore-Test pro Sensor unter `tests/sensor/`).
+
+Zwei weitere zunächst offene Punkte wurden im Recheck vom 2026-08-21 direkt behoben (reine
+Dokumentationskorrekturen, kein Entscheidungsbedarf):
+
+- Die Wahrscheinlichkeitsaussage in `SUPPORTED_DEVICES.md` ("it will very likely work") ist
+  entfernt; die Datei nennt OCPP 1.6J über `ws://`/`wss://` jetzt nur noch als technische
+  Voraussetzung, nicht als Kompatibilitätsprognose.
+- `docs/user/CONFIGURATION.md`s Diagnoseexport-Beschreibung nennt jetzt Reconnect-Zähler und die
+  letzte Transaktion je Connector inklusive deren Redaction (`id_tag`).
+
+Phase 2 bleibt nach der Dokumentationskorrektur bewusst pausiert, bis reale Hardware verfügbar ist.
+Die fehlende Hardwarevalidierung blockiert belastbare Kompatibilitätsaussagen, aber nicht die
+Arbeit an den anderen Phasen.
+
 ## Phasenplan
 
 Jede Phase ist separat review- und auslieferbar. Eine folgende Phase setzt nur die ausdrücklich genannten Ergebnisse
@@ -123,8 +154,10 @@ aktivieren und mit einem absichtlichen Typ- und Testfehler verifizieren.
 Struktur vorbereiten, keine Geräteeinträge erfinden.**
 
 **Empfehlung aus dem Recheck:** Das vorbereitete Gerüst ist sinnvoll. Bis zum ersten realen Test
-auch auf Wahrscheinlichkeitsaussagen zur Kompatibilität verzichten: OCPP 1.6J über `ws://` ist
-eine technische Voraussetzung, aber noch kein Nachweis, dass ein konkretes Gerät funktioniert.
+auch auf Wahrscheinlichkeitsaussagen zur Kompatibilität verzichten: OCPP 1.6J über `ws://`/`wss://`
+ist eine technische Voraussetzung, aber noch kein Nachweis, dass ein konkretes Gerät funktioniert
+— `SUPPORTED_DEVICES.md` wurde am 2026-08-21 entsprechend korrigiert (keine
+Wahrscheinlichkeitsaussage mehr).
 
 - **Ziel:** Aussagen zur Geräteunterstützung beruhen auf reproduzierbaren Tests statt auf Protokollannahmen.
 - **Dateien:** neue, ausdrücklich freizugebende `docs/user/SUPPORTED_DEVICES.md`,
@@ -139,7 +172,7 @@ eine technische Voraussetzung, aber noch kein Nachweis, dass ein konkretes Gerä
 
 ### Phase 3 – Sitzungs- und Verbindungsdiagnostik ergänzen
 
-**Status: funktional umgesetzt, Abnahme teilweise offen (Recheck 2026-08-21).** Fünf neue Sensoren:
+**Status: umgesetzt, inkl. Restart-Verhalten (2026-08-21).** Fünf neue Sensoren:
 `last_transaction_id`, `session_duration_s`,
 `session_energy_wh`, `last_stop_reason` (connector-scoped, über den neuen
 `QueryService.get_last_transaction()`-Lesepfad) und `reconnect_count` (charge-point-scoped,
@@ -149,15 +182,15 @@ naheliegender traffic-freier Signal gefunden). `diagnostics.py` erweitert um `re
 Charge Point und einen `last_transaction`-Eintrag je Connector (`id_tag` darin neu in `_TO_REDACT`
 aufgenommen).
 
-Start/Stop, Reconnect, Entity-Zustände und Redaction sind automatisiert nachgewiesen. Das im Plan
-genannte Restart-Szenario ist dagegen weder durch einen Test noch durch eine ausdrückliche
-Erwartungsbeschreibung abgedeckt. Transaktionshistorie und Reconnect-Zähler liegen derzeit nur im
-Arbeitsspeicher und beginnen nach einem HA-Neustart neu.
-
-**Empfehlung:** Entscheiden und dokumentieren, ob diese Werte bewusst nur für den laufenden Prozess
-gelten. Falls ja, dieses Reset-Verhalten mit einem Reload-/Restart-Test absichern und in der
-Nutzerdokumentation kenntlich machen. Nur wenn Sitzungsdaten einen Neustart überleben sollen, eine
-separate Persistenzentscheidung treffen; Persistenz ist nicht stillschweigend Teil dieser Phase.
+Start/Stop, Reconnect, Entity-Zustände und Redaction sind automatisiert nachgewiesen; die
+Diagnoseexport-Dokumentation nennt seit dem 2026-08-21-Recheck auch Reconnect-Zähler und letzte
+Transaktion. Das Restart-Szenario, das der Recheck als offen markiert hatte, ist ebenfalls
+entschieden und umgesetzt: alle fünf Sensoren stellen ihren zuletzt bekannten Wert per
+`RestoreSensor` über einen HA-Neustart hinweg wieder her (siehe `DECISIONS.md` "Phase-3 diagnostic
+sensors restore across a HA restart"), automatisiert mit je einem Restore-Test pro Sensor
+abgesichert. Der Domain-Layer selbst (`TransactionManager`/`ChargePointRegistryStore`) bleibt
+unverändert rein im Arbeitsspeicher -- die Wiederherstellung passiert ausschließlich auf
+Entity-Ebene, exakt wie bei `number.power_limit_w`.
 
 - **Ziel:** Nutzer können einen Ladevorgang und Verbindungsprobleme ohne DEBUG-Vollframes nachvollziehen.
 - **Dateien:** `custom_components/ocpp/core/domain/models.py`, `transactions.py`, `registry.py`, `query.py`,

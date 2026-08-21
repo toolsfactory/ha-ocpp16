@@ -8,9 +8,10 @@ structure for recording real-device results once they exist — it deliberately 
 supported before that happens (see [COMPARISON_LBBRHZN_OCPP.md](../development/COMPARISON_LBBRHZN_OCPP.md)'s
 Phase 2, currently paused until hardware becomes available).
 
-If your charge point speaks OCPP 1.6J over a plain `ws://` WebSocket, it will very likely work — OCPP 1.6 is a
-standardized protocol and this integration doesn't rely on undocumented behavior. "Not listed here" means "not
-yet verified," not "known to be incompatible."
+Speaking OCPP 1.6J over `ws://` (or `wss://`, see [CONFIGURATION.md](./CONFIGURATION.md#tls-certificate-wss)) is
+the technical prerequisite this integration relies on — it is not by itself evidence that a specific device works,
+only that it meets the baseline the protocol requires. "Not listed here" means "not yet verified," not "known to
+be incompatible."
 
 ## How an entry gets added
 

@@ -118,9 +118,10 @@ first `BootNotification` — there is nothing to register manually.
   (energy, voltage, current, temperature, state of charge, ...)
 - **Last Heartbeat** (per charge point) — timestamp of the charge point's most recent heartbeat
 - **Transaction ID / Session Duration / Session Energy / Stop Reason** — the connector's most
-  recent charging session, active or already stopped
-- **Reconnect Count** (per charge point, diagnostic) — how many times it has (re)connected since
-  Home Assistant started
+  recent charging session, active or already stopped. Each restores its last known value across a
+  Home Assistant restart until this connector sees a new transaction
+- **Reconnect Count** (per charge point, diagnostic) — how many times it has (re)connected,
+  including across Home Assistant restarts
 
 #### Switches
 

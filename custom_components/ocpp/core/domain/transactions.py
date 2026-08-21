@@ -1,8 +1,11 @@
 """Transaktions-Lebenszyklus (REQ-0006, REQ-0007): Start/Stopp, Historie.
 
-Transaktions-IDs werden zentral hier vergeben (monoton steigend, eindeutig
-für die Prozesslaufzeit) — Persistenz über einen Neustart hinaus ist laut
-architecture.md explizit Non-Goal für Stufe 3.
+Transaktions-IDs werden zentral hier vergeben (monoton steigend, eindeutig für die
+Prozesslaufzeit) -- dieser Store selbst bleibt bewusst rein im Arbeitsspeicher, keine
+Persistenz über einen HA-Neustart hinweg (unverändert seit Einführung in Stufe 3, siehe
+COMPARISON_LBBRHZN_OCPP.md). Die Sensoren, die daraus lesen (``sensor/last_transaction_id.py``
+u. a.), haben seit dem 2026-08-21-Recheck ihre eigene, unabhängige Wiederherstellung per
+``RestoreSensor`` -- Entity-Layer-Restore, kein Domain-Layer-Snapshot, siehe DECISIONS.md.
 """
 
 from collections.abc import Sequence

@@ -4,7 +4,7 @@ from custom_components.ocpp.const import MEASURAND_ENERGY_ACTIVE_IMPORT_REGISTER
 from custom_components.ocpp.coordinator import OcppCoordinator
 from custom_components.ocpp.core.domain.models import MeterSample, TransactionSnapshot
 from custom_components.ocpp.runtime import OcppEntryData
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+from homeassistant.components.sensor import RestoreSensor, SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy
 
 from ._base import _OcppConnectorSensorBase
@@ -27,13 +27,18 @@ def _parse_energy_wh(sample: MeterSample) -> float | None:
     return value * multiplier
 
 
-class OcppSessionEnergySensor(_OcppConnectorSensorBase):
+class OcppSessionEnergySensor(_OcppConnectorSensorBase, RestoreSensor):
     """Gelieferte Energie der letzten Session in Wh.
 
     Beendet: ``meter_stop_wh - meter_start_wh`` (bereits von OCPP in Wh gemeldet). Aktiv: letzter
     phasenloser ``Energy.Active.Import.Register``-Messwert dieser Transaktion minus
     ``meter_start_wh`` -- ``unknown`` (nicht ``0``), solange noch kein solcher Messwert einging
     (Konvention wie ``current_power_w``/``effective_power_limit_w``).
+
+    Über einen HA-Neustart hinweg wird der zuletzt bekannte Wert per ``RestoreSensor``
+    wiederhergestellt, bis diese Prozesslaufzeit selbst eine Transaktion auf diesem Connector sieht
+    -- eine zum Neustart-Zeitpunkt noch aktive Session bleibt bis dahin auf dem wiederhergestellten
+    Wert eingefroren statt live weiterzuzählen.
     """
 
     _attr_translation_key = "session_energy_wh"
@@ -48,6 +53,14 @@ class OcppSessionEnergySensor(_OcppConnectorSensorBase):
     ) -> None:
         """Initialize the entity for the given charge point connector."""
         super().__init__(coordinator, entry_data, charge_point_id, connector_id, "session_energy_wh")
+        self._restored_value: float | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last known session energy across a HA restart, if one was ever recorded."""
+        await super().async_added_to_hass()
+        last_data = await self.async_get_last_sensor_data()
+        if last_data is not None and isinstance(last_data.native_value, int | float):
+            self._restored_value = float(last_data.native_value)
 
     def _current_energy_wh(self, transaction: TransactionSnapshot) -> float | None:
         samples = self._entry_data.app.query_service.get_meter_samples(
@@ -61,10 +74,10 @@ class OcppSessionEnergySensor(_OcppConnectorSensorBase):
 
     @property
     def native_value(self) -> float | None:
-        """Return the last session's delivered energy in Wh, or `None` if unknown."""
+        """Return the last session's delivered energy in Wh, or the restored value if none ran yet."""
         transaction = self._entry_data.app.query_service.get_last_transaction(self._charge_point_id, self._connector_id)
         if transaction is None:
-            return None
+            return self._restored_value
         if transaction.stopped_at is not None:
             meter_stop_wh = transaction.meter_stop_wh
             if meter_stop_wh is None:
