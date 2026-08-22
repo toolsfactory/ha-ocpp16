@@ -5,6 +5,7 @@ from typing import Any
 from custom_components.ocpp16.const import DOMAIN
 from custom_components.ocpp16.coordinator import Ocpp16Coordinator
 from custom_components.ocpp16.core.domain.commands import CommandError
+from custom_components.ocpp16.core.domain.models import ConnectorSnapshot
 from custom_components.ocpp16.runtime import Ocpp16EntryData
 from homeassistant.exceptions import HomeAssistantError
 
@@ -28,7 +29,7 @@ class Ocpp16AvailabilitySwitch(_OcppConnectorSwitchBase):
         self._last_change_status: str | None = None
 
     @property
-    def _connector_snapshot(self):
+    def _connector_snapshot(self) -> ConnectorSnapshot | None:
         return self._entry_data.app.query_service.get_connector(self._charge_point_id, self._connector_id)
 
     @property

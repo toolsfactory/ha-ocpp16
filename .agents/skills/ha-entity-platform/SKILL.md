@@ -86,7 +86,7 @@ The mechanical rules are in the instructions file. What this step actually costs
 Implement only the platform members and the value extraction; everything else comes from the base class.
 
 ```python
-class {ClassPrefix}AirQualitySensor(SensorEntity, {ClassPrefix}Entity):
+class {ClassPrefix}AirQualitySensor({ClassPrefix}Entity, SensorEntity):
     """Air quality sensor."""
 
     entity_description: {ClassPrefix}SensorEntityDescription

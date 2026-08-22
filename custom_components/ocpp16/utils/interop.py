@@ -38,10 +38,10 @@ def _parse_power_w(sample: MeterSample) -> float | None:
     try:
         value = float(sample.value)
     except ValueError:
-        _LOGGER.debug("Nicht-numerischer Power.Active.Import-Wert %r, wird ignoriert.", sample.value)
+        _LOGGER.debug("Nicht-numerischer Power.Active.Import-Wert %r, wird ignoriert", sample.value)
         return None
     if sample.unit is not None and sample.unit not in _POWER_UNIT_MULTIPLIERS:
-        _LOGGER.debug("Unbekannte Einheit %r für Power.Active.Import, wird als W behandelt.", sample.unit)
+        _LOGGER.debug("Unbekannte Einheit %r für Power.Active.Import, wird als W behandelt", sample.unit)
     multiplier = _POWER_UNIT_MULTIPLIERS.get(sample.unit or "W", 1.0)
     return value * multiplier
 

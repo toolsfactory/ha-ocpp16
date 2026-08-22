@@ -37,11 +37,13 @@ custom_components/ocpp16/
 │   └── ocpp16/                 # OCPP 1.6 message handlers, python-ocpp glue, watchdog
 ├── coordinator/               # Thin push coordinator — see "Push, not poll" below
 ├── config_flow_handler/       # The real config flow (config_flow.py, options_flow.py)
-├── entity/                    # Ocpp16ConnectorEntity — shared base for every connector entity
+├── entity/                    # Ocpp16ConnectorEntity/Ocpp16ChargePointEntity — shared entity bases
 ├── entity_utils/              # Device-info helpers (device.py): charge-point/connector DeviceInfo
-├── sensor/                    # charge_point_state, current_power, effective_power_limit, measurand
+├── sensor/                    # charge_point_state, current_power, effective_power_limit, measurand, ...
 ├── switch/                    # start_stop, availability
-├── service_actions/           # The 7 HA services — see docs/development/INTEROP_CONTRACT.md
+├── number/                    # power_limit
+├── button/                    # reset, unlock_connector
+├── service_actions/           # The 9 HA services — see docs/development/INTEROP_CONTRACT.md
 └── utils/                     # interop.py: the REQ-0035 capability adapter
 ```
 
@@ -121,20 +123,23 @@ duplicate host:port is caught explicitly via `_host_port_already_configured()` i
 
 ### `entity/` + `entity_utils/`
 
-**Key class:** `Ocpp16ConnectorEntity` (in `entity/base.py`) — the shared base every connector-scoped
-sensor/switch extends: unique ID (`{charge_point_id}_{connector_id}_{entity_key}`), device info via
-`entity_utils/device.py`, and the `available` override (online-status check, not
+**Key classes:** `Ocpp16ConnectorEntity` and `Ocpp16ChargePointEntity` (in `entity/base.py`) — the
+shared bases every connector-scoped and charge-point-scoped entity extends respectively: unique ID
+(`{entry_id}:{len(charge_point_id)}:{charge_point_id}:{connector_id}_{entity_key}` for connector
+entities — the length-prefixed `charge_point_id` makes the split unambiguous regardless of its
+content, see [`INTEROP_CONTRACT.md`](./INTEROP_CONTRACT.md) for the full addressing scheme), device
+info via `entity_utils/device.py`, and the `available` override (online-status check, not
 `last_update_success` — the coordinator never fails in a way that would make that meaningful).
 
 ## Platform Organization
 
-Each platform (`sensor/`, `switch/`) follows this pattern:
+Each platform (`sensor/`, `switch/`, `number/`, `button/`) follows this pattern:
 
 ```text
 <platform>/
 ├── __init__.py               # async_setup_entry, the _<Platform>Manager that creates entities
 │                              # dynamically as connectors/measurands are discovered, PARALLEL_UPDATES
-├── _base.py                  # The platform's _Ocpp...Base(Ocpp16ConnectorEntity, <PlatformEntity>)
+├── _base.py                  # The platform's _Ocpp...Base(Ocpp16Connector|ChargePointEntity, <PlatformEntity>)
 └── <entity_name>.py           # One entity class per file (AGENTS.md), imports the base from ._base
 ```
 

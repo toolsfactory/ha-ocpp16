@@ -667,6 +667,46 @@ was created for) was addressed separately in `GETTING_STARTED.md`.
 
 ---
 
+### Entity base classes inherit mixin-first: `({ClassPrefix}Entity, PlatformEntity)`
+
+**Date:** 2026-08-22
+
+**Context:** A quality review flagged a three-way contradiction: every `_base.py` file
+(`sensor|switch|number|button/_base.py`) implements `(Ocpp16...Entity, PlatformEntity)`, mixin
+first; `docs/development/ARCHITECTURE.md` documents that same order; but
+`.agents/instructions/blueprint.entities.instructions.md` and
+`.agents/skills/ha-entity-platform/SKILL.md` both stated the opposite —
+`(PlatformEntity, {ClassPrefix}Entity)`. The review's instruction was to decide which side was
+actually correct before changing anything, not to silently pick one.
+
+**Decision:** The rule text was wrong, not the code. Corrected
+`blueprint.entities.instructions.md` and `ha-entity-platform/SKILL.md` to mixin-first, matching the
+code and `ARCHITECTURE.md`. The four `_base.py` files are unchanged.
+
+**Rationale:**
+
+- Checked against installed Home Assistant 2026.8 core (`homeassistant/helpers/entity.py`,
+  `homeassistant/components/sensor/__init__.py` and the equivalent switch/number/button modules):
+  `SensorEntity`/`SwitchEntity`/`NumberEntity`/`ButtonEntity` don't themselves override
+  `available`/`should_poll`/`__init__` today, so neither order breaks anything live right now.
+- Home Assistant Core's own convention is overwhelmingly mixin-first: a repository-wide grep of
+  `homeassistant/components/` found `class X(CoordinatorEntity, SomeEntity)` 486 times against only
+  4 the other way round (those 4 read as inconsistencies, not an intentional alternate style).
+  Putting the mixin first is defensive — it keeps `Ocpp16ConnectorEntity`'s/
+  `Ocpp16ChargePointEntity`'s overrides winning in the MRO even if a future Home Assistant release
+  adds a conflicting member (`available`, `should_poll`, an `__init__` override) to the platform
+  entity class.
+
+**Consequences:**
+
+- `.agents/instructions/` and `.agents/skills/` are not listed in `.templatesyncignore`, so a
+  future template-sync pull request could reintroduce the blueprint's original (per this analysis,
+  incorrect) rule text. Not solved here — a template-sync PR touching either file needs a
+  deliberate look at this entry before merging, not an assumption that "the template version wins"
+  is automatically right.
+
+---
+
 ## Decision Review
 
 These decisions should be reviewed periodically (suggested: quarterly or when major features are added) to ensure they still serve the integration's needs.

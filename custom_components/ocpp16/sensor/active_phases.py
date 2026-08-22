@@ -6,6 +6,7 @@ from custom_components.ocpp16.const import MEASURAND_CURRENT_IMPORT
 from custom_components.ocpp16.coordinator import Ocpp16Coordinator
 from custom_components.ocpp16.runtime import Ocpp16EntryData
 from homeassistant.components.sensor import SensorStateClass
+from homeassistant.core import callback
 
 from ._base import _OcppConnectorSensorBase
 
@@ -28,8 +29,9 @@ class Ocpp16ActivePhasesSensor(_OcppConnectorSensorBase):
     ) -> None:
         """Initialize the entity for the given charge point connector."""
         super().__init__(coordinator, entry_data, charge_point_id, connector_id, "active_phases")
+        self._currents = self._compute_phase_currents()
 
-    def _phase_currents(self) -> dict[str, float | None]:
+    def _compute_phase_currents(self) -> dict[str, float | None]:
         samples = self._entry_data.app.query_service.get_meter_samples(
             charge_point_id=self._charge_point_id, connector_id=self._connector_id
         )
@@ -50,17 +52,25 @@ class Ocpp16ActivePhasesSensor(_OcppConnectorSensorBase):
                 result[phase] = None
         return result
 
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        # native_value and extra_state_attributes must describe the same instant -- caching one
+        # snapshot per update, instead of each property re-querying and re-filtering the mutable
+        # sample list independently, keeps a single state-write internally consistent even if
+        # another MeterValues event lands between property reads.
+        self._currents = self._compute_phase_currents()
+        super()._handle_coordinator_update()
+
     @property
     def native_value(self) -> int:
         """Return how many phases currently report a nonzero `Current.Import`."""
-        return sum(1 for value in self._phase_currents().values() if value is not None and value > 0)
+        return sum(1 for value in self._currents.values() if value is not None and value > 0)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return each phase's current reading in amperes, or `None` if that phase isn't reporting."""
-        currents = self._phase_currents()
         return {
-            "phase_l1_a": currents["L1"],
-            "phase_l2_a": currents["L2"],
-            "phase_l3_a": currents["L3"],
+            "phase_l1_a": self._currents["L1"],
+            "phase_l2_a": self._currents["L2"],
+            "phase_l3_a": self._currents["L3"],
         }

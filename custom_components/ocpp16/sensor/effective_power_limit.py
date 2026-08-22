@@ -17,12 +17,8 @@ from ._base import _OcppConnectorSensorBase
 _LOGGER = logging.getLogger(__name__)
 
 # Central-System-initiierte Aufrufe können jederzeit an einem erwartbaren Geräte-/
-# Verbindungsproblem scheitern -- diese drei bleiben gefangen, alles andere (ein echter
-# Programmierfehler) propagiert sichtbar statt in einem pauschalen `except Exception` zu
-# verschwinden. `TimeoutError` ist seit Python 3.11 ein Alias für `asyncio.TimeoutError`.
-# Als benannte Konstante statt Inline-Tupel, weil `ruff format` 0.16.0 bei einem
-# dreielementigen Tupel-Literal direkt in einer `except`-Klausel dessen Klammern entfernt
-# (gültige, aber unkonventionelle Python-3-Syntax) -- reproduzierbar isoliert nachvollzogen.
+# Verbindungsproblem scheitern -- diese drei bleiben gefangen, alles andere propagiert sichtbar
+# statt in einem pauschalen `except Exception` zu verschwinden.
 _EXPECTED_REFRESH_ERRORS = (CommandError, TimeoutError, ConnectionError)
 
 
@@ -88,7 +84,7 @@ class Ocpp16EffectivePowerLimitSensor(_OcppConnectorSensorBase):
                     )
                 except _EXPECTED_REFRESH_ERRORS:
                     _LOGGER.debug(
-                        "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert.",
+                        "GetCompositeSchedule für %s/%s fehlgeschlagen, Wert bleibt unverändert",
                         self._charge_point_id,
                         self._connector_id,
                         exc_info=True,

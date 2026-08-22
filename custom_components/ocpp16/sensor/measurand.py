@@ -15,16 +15,15 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.typing import StateType
 
 from ._base import _OcppConnectorSensorBase
 
 _LOGGER = logging.getLogger(__name__)
 
-# REQ-0018 AC3: Gesamtenergiezähler muss mit passender device_class/
-# state_class fürs Energie-Dashboard erkennbar sein. Weitere gängige OCPP-1.6-
-# Measurands (nicht abschließend -- unbekannte Measurands bekommen keine
-# device_class, zeigen aber weiterhin den gemeldeten Rohwert/die Roheinheit).
+# REQ-0018 AC3, nicht abschließend -- ein unbekannter Measurand bekommt keine device_class, zeigt
+# aber weiterhin seinen gemeldeten Rohwert/seine Roheinheit.
 _MEASURAND_META: dict[str, tuple[SensorDeviceClass | None, SensorStateClass | None]] = {
     "Energy.Active.Import.Register": (SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
     "Energy.Active.Export.Register": (SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
@@ -39,9 +38,8 @@ _MEASURAND_META: dict[str, tuple[SensorDeviceClass | None, SensorStateClass | No
     "Power.Offered": (SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT),
 }
 
-# Lesbare Anzeigenamen für die in _MEASURAND_META bekannten Measurands (REQ-0018,
-# Quality-Scale-Regel entity-translations) -- unbekannte Measurands fallen auf eine
-# humanisierte Version des rohen OCPP-Strings zurück, nie ein harter Fehler.
+# Anzeigenamen für _MEASURAND_META (REQ-0018, Quality-Scale-Regel entity-translations) --
+# unbekannte Measurands fallen auf eine humanisierte Version des Rohstrings zurück.
 _MEASURAND_DISPLAY_NAMES: dict[str, str] = {
     "Energy.Active.Import.Register": "Energy (Import)",
     "Energy.Active.Export.Register": "Energy (Export)",
@@ -105,21 +103,26 @@ class Ocpp16MeasurandSensor(_OcppConnectorSensorBase):
         device_class, state_class = _MEASURAND_META.get(measurand, (None, None))
         self._attr_device_class = device_class
         self._attr_state_class = state_class
-        # Measurands außerhalb _MEASURAND_META sind roh gemeldete OCPP-Werte, die OCPP nicht
-        # genug kennt, um ihnen eine device_class/state_class zuzuweisen (Quality-Scale-Regel
-        # entity-disabled-by-default) -- standardmäßig deaktiviert, über die Entity Registry
-        # aktivierbar, statt jede seltene/unbekannte Messgröße ungefragt in der UI aufzulisten.
+        # Unbekannte Measurands standardmäßig deaktiviert (Quality-Scale-Regel
+        # entity-disabled-by-default), statt jede seltene Messgröße ungefragt zu zeigen.
         self._attr_entity_registry_enabled_default = measurand in _MEASURAND_META
+        self._sample = self._compute_sample()
 
-    @property
-    def _sample(self) -> MeterSample | None:
+    def _compute_sample(self) -> MeterSample | None:
         samples = self._entry_data.app.query_service.get_meter_samples(
             charge_point_id=self._charge_point_id, connector_id=self._connector_id
         )
         matching = [s for s in samples if s.measurand == self._measurand and s.phase == self._phase]
-        if not matching:
-            return None
-        return max(matching, key=lambda s: s.recorded_at)
+        return max(matching, key=lambda s: s.recorded_at) if matching else None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        # native_value/native_unit_of_measurement/extra_state_attributes must all describe the
+        # same sample -- caching one snapshot per update, instead of each property re-querying and
+        # re-filtering the mutable sample list independently, keeps a single state-write internally
+        # consistent even if another MeterValues event lands between property reads.
+        self._sample = self._compute_sample()
+        super()._handle_coordinator_update()
 
     @property
     def native_value(self) -> StateType:
@@ -140,7 +143,7 @@ class Ocpp16MeasurandSensor(_OcppConnectorSensorBase):
             return float(sample.value)
         except ValueError:
             _LOGGER.debug(
-                "Nicht-numerischer Wert %r für Measurand %s (Connector %s/%s), wird ignoriert.",
+                "Nicht-numerischer Wert %r für Measurand %s (Connector %s/%s), wird ignoriert",
                 sample.value,
                 self._measurand,
                 self._charge_point_id,

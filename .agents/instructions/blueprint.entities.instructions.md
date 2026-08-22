@@ -49,7 +49,7 @@ assumes have already been made.
 
 ## Base Entity Inheritance
 
-**MUST inherit from:** `(PlatformEntity, {ClassPrefix}Entity)` — the integration's base entity class from `..entity`, order matters for MRO
+**MUST inherit from:** `({ClassPrefix}Entity, PlatformEntity)` — the integration's base entity class from `..entity`, order matters for MRO. The base class first, matching Home Assistant Core's own convention for a coordinator/domain mixin combined with a platform entity class — this keeps the mixin's overrides (`available`, `should_poll`, `__init__`) winning in the MRO even if a future HA release adds a conflicting member to the platform class.
 
 **Base class provides:** Coordinator integration, device info, unique ID (`{entry_id}_{description.key}`), attribution, entity naming
 
