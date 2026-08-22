@@ -5,8 +5,7 @@
 **No charge point has been validated against real hardware yet.** This project has so far only been exercised
 against an OCPP 1.6 simulator (see [GETTING_STARTED.md](./GETTING_STARTED.md#prerequisites)). This page is the
 structure for recording real-device results once they exist — it deliberately does not list any device as
-supported before that happens (see [COMPARISON_LBBRHZN_OCPP.md](../development/COMPARISON_LBBRHZN_OCPP.md)'s
-Phase 2, currently paused until hardware becomes available).
+supported before that happens (real-hardware validation is currently paused until hardware becomes available).
 
 Speaking OCPP 1.6J over `ws://` (or `wss://`, see [CONFIGURATION.md](./CONFIGURATION.md#tls-certificate-wss)) is
 the technical prerequisite this integration relies on — it is not by itself evidence that a specific device works,
@@ -17,7 +16,7 @@ be incompatible."
 
 A device is added to the table below only after someone has actually connected it and confirmed the listed
 behavior — not from reading its documentation or the OCPP spec alone. If you've tried this integration with real
-hardware, please [open an issue](https://github.com/toolsfactory/ocpp-ha/issues) with the details below; a
+hardware, please [open an issue](https://github.com/toolsfactory/ha-ocpp16/issues) with the details below; a
 maintainer will turn it into a table row (and a regression test, if a device-specific workaround was needed).
 
 ## Device compatibility table

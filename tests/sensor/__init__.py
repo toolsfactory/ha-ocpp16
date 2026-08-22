@@ -1,1 +1,1 @@
-"""Tests for the ocpp sensor platform."""
+"""Tests for the ocpp16 sensor platform."""

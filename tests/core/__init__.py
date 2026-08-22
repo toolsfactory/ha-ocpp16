@@ -1,1 +1,1 @@
-"""Tests for the standalone core (custom_components/ocpp/core/)."""
+"""Tests for the standalone core (custom_components/ocpp16/core/)."""

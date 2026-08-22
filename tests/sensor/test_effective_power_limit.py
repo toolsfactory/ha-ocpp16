@@ -1,4 +1,4 @@
-"""Tests for `OcppEffectivePowerLimitSensor` (Fähigkeit 5, REQ-0035 AC4)."""
+"""Tests for `Ocpp16EffectivePowerLimitSensor` (Fähigkeit 5, REQ-0035 AC4)."""
 
 import asyncio
 from collections.abc import Callable
@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import DOMAIN
-from custom_components.ocpp.core.domain.commands import ChargePointNotConnectedError, CompositeScheduleResult
-from custom_components.ocpp.entity_utils.device import connector_identifier
+from custom_components.ocpp16.const import DOMAIN
+from custom_components.ocpp16.core.domain.commands import ChargePointNotConnectedError, CompositeScheduleResult
+from custom_components.ocpp16.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform, entity_registry as er
 
@@ -20,7 +20,7 @@ def _get_entity(hass: HomeAssistant, entity_id: str):
     for platform in entity_platform.async_get_platforms(hass, DOMAIN):
         if entity_id in platform.entities:
             return platform.entities[entity_id]
-    raise AssertionError(f"entity {entity_id} not found on any ocpp platform")
+    raise AssertionError(f"entity {entity_id} not found on any ocpp16 platform")
 
 
 async def test_refreshes_via_get_composite_schedule_on_a_connector_scoped_event(

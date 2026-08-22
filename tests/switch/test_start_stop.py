@@ -1,4 +1,4 @@
-"""Tests for `OcppStartStopSwitch` (REQ-0020)."""
+"""Tests for `Ocpp16StartStopSwitch` (REQ-0020)."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.ocpp.entity_utils.device import connector_identifier
+from custom_components.ocpp16.const import CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp16.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er

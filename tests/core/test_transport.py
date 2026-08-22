@@ -4,9 +4,9 @@ Real localhost sockets, not mocks: `mock_app_start_stop` (used everywhere else i
 patches `CentralSystemApp.start` wholesale, so nothing else in the suite ever calls `start_server()`
 for real. These tests bind to `127.0.0.1:0` (an OS-assigned ephemeral port) and drive a real
 `websockets` client through a full `BootNotification` round trip -- for the TLS test, this is also
-the live `wss://` handshake verification `COMPARISON_LBBRHZN_OCPP.md`'s Phase 5 flagged as
-outstanding (self-signed cert from the `tls_cert_pair` fixture, client-side verification disabled
-the same way any test client talking to a self-signed cert would need to).
+the live `wss://` handshake verification (self-signed cert from the `tls_cert_pair` fixture,
+client-side verification disabled the same way any test client talking to a self-signed cert
+would need to).
 """
 
 import asyncio
@@ -19,15 +19,15 @@ import websockets
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import Server
 
-from custom_components.ocpp.core.config import AppConfig
-from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider
-from custom_components.ocpp.core.domain.connector_state import ConnectorStateStore
-from custom_components.ocpp.core.domain.events import EventBus
-from custom_components.ocpp.core.domain.meter_values import MeterValueStore
-from custom_components.ocpp.core.domain.registry import ChargePointRegistryStore
-from custom_components.ocpp.core.domain.transactions import TransactionManager
-from custom_components.ocpp.core.ocpp16.handlers import HandlerServices
-from custom_components.ocpp.core.transport import build_ssl_context, start_server
+from custom_components.ocpp16.core.config import AppConfig
+from custom_components.ocpp16.core.domain.authorization import StaticAuthorizationProvider
+from custom_components.ocpp16.core.domain.connector_state import ConnectorStateStore
+from custom_components.ocpp16.core.domain.events import EventBus
+from custom_components.ocpp16.core.domain.meter_values import MeterValueStore
+from custom_components.ocpp16.core.domain.registry import ChargePointRegistryStore
+from custom_components.ocpp16.core.domain.transactions import TransactionManager
+from custom_components.ocpp16.core.ocpp16.handlers import HandlerServices
+from custom_components.ocpp16.core.transport import build_ssl_context, start_server
 
 CHARGE_POINT_ID = "CP001"
 _BOOT_NOTIFICATION = '[2,"1","BootNotification",{"chargePointVendor":"Test-Vendor","chargePointModel":"Test-Model"}]'

@@ -20,11 +20,11 @@ against it — this one is not a substitute for that source of truth, only a wor
 **There is no shared code, and there should not be.** The integration boundary is Home Assistant
 itself: entity states/attributes, the device registry, and services. A load-management integration
 reads OCPP's sensors and calls OCPP's services exactly like a dashboard or automation would —
-nothing here requires importing anything from `custom_components.ocpp`.
+nothing here requires importing anything from `custom_components.ocpp16`.
 
 ## Self-description: read `supported_capabilities` first
 
-Every charge point's status sensor (`OcppChargePointStateSensor`, capability 2 below) exposes a
+Every charge point's status sensor (`Ocpp16ChargePointStateSensor`, capability 2 below) exposes a
 `supported_capabilities` attribute — an integer bitmask. **A load-management integration should
 read this at runtime rather than hardcoding which capabilities are available.** OCPP currently
 always reports `127` (capabilities 1–6 and 8; see the table), but the bitmask exists so a consumer
@@ -55,16 +55,16 @@ human-editable strings. Resolve through the identifiers below instead, exactly a
 own test suite does (`homeassistant.helpers.entity_registry.async_get_entity_id`).
 
 - **Charge point device:** identifier `(DOMAIN, charge_point_identifier(entry_id, charge_point_id))`
-  = `(DOMAIN, f"{entry_id}:{charge_point_id}")`, e.g. `("ocpp", "01ABC...:CP001")`. `DOMAIN` is
-  `"ocpp"`; `entry_id` is the owning config entry's ID — like the entity `unique_id` below, this
+  = `(DOMAIN, f"{entry_id}:{charge_point_id}")`, e.g. `("ocpp16", "01ABC...:CP001")`. `DOMAIN` is
+  `"ocpp16"`; `entry_id` is the owning config entry's ID — like the entity `unique_id` below, this
   identifier is entry-scoped, not just `charge_point_id` alone, so two instances that happen to see
   the same `chargePointId` never collide. Build it with
-  [`entity_utils/device.py`](../../custom_components/ocpp/entity_utils/device.py)'s
+  [`entity_utils/device.py`](../../custom_components/ocpp16/entity_utils/device.py)'s
   `charge_point_identifier()`, never by hand.
 - **Connector device:** identifier
   `(DOMAIN, connector_identifier(entry_id, charge_point_id, connector_id))` =
   `(DOMAIN, f"{entry_id}:{len(charge_point_id)}:{charge_point_id}:{connector_id}")`, e.g.
-  `("ocpp", "01ABC...:5:CP001:1")` — the same length-prefixing as the entity `unique_id` below, for
+  `("ocpp16", "01ABC...:5:CP001:1")` — the same length-prefixing as the entity `unique_id` below, for
   the same reason. Build it with `entity_utils/device.py`'s `connector_identifier()`.
   `connectorId` `0` (the charge point as a whole, per OCPP 1.6) never gets its own device — there
   are no capability-1/5/6 entities for it.
@@ -91,12 +91,12 @@ from there.
 | --- | --- | -------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | 1   | Current power              | `sensor`, `entity_key="current_power_w"`         | Watts. **`unknown`** (not `0`) until a matching `Power.Active.Import` measurand has actually been reported.                                                                                                                                                                                                                                                                                       |
 | 2   | 2   | State                      | `sensor`, `entity_key="charge_point_state"`      | Five-value state (`not_connected`/`ready`/`charging`/`unavailable`/`error`) — see [State mapping](#state-mapping). Carries the discovery attributes (capability 7).                                                                                                                                                                                                                               |
-| 3   | 4   | Set power limit            | service `ocpp.set_power_limit`                   | `{device_id, limit_w, phases?}` → connector device. Success returns `{"status": "accepted"}`; a `"rejected"`/`"not_supported"` outcome raises `ServiceValidationError` instead of returning that status as data (breaking change, 2026-08-19 — see [DECISIONS.md](./DECISIONS.md)).                                                                                                               |
-| 4   | 8   | Clear power limit          | service `ocpp.clear_power_limit`                 | `{device_id}` → connector device. Success returns `{"status": "accepted"}`; an `"unknown"` outcome (no matching profile to clear) raises `ServiceValidationError` the same way.                                                                                                                                                                                                                   |
+| 3   | 4   | Set power limit            | service `ocpp16.set_power_limit`                 | `{device_id, limit_w, phases?}` → connector device. Success returns `{"status": "accepted"}`; a `"rejected"`/`"not_supported"` outcome raises `ServiceValidationError` instead of returning that status as data (breaking change, 2026-08-19 — see [DECISIONS.md](./DECISIONS.md)).                                                                                                               |
+| 4   | 8   | Clear power limit          | service `ocpp16.clear_power_limit`               | `{device_id}` → connector device. Success returns `{"status": "accepted"}`; an `"unknown"` outcome (no matching profile to clear) raises `ServiceValidationError` the same way.                                                                                                                                                                                                                   |
 | 5   | 16  | Read effective power limit | `sensor`, `entity_key="effective_power_limit_w"` | Watts, read back from the charge point via `GetCompositeSchedule`. **`unknown`** (not `0`) until the first successful read; only refreshes on a connector-scoped event, so it can lag a `set_power_limit` call until the next status update.                                                                                                                                                      |
 | 6   | 32  | Availability               | `switch`, `entity_key="availability"`            | `on` = operative, `off` = inoperative. A `"Scheduled"` `ChangeAvailability` response does **not** flip the switch state immediately — see [Scheduled availability changes](#scheduled-availability-changes).                                                                                                                                                                                      |
 | 7   | —   | Discovery                  | Attributes on the capability-2 sensor            | `supported_capabilities` (bitmask, above), `raw_ocpp_status`, `error_code`, `min_power_limit_w`, `max_power_limit_w` (always `null` — OCPP 1.6 has no generic query for these), `supported_phases` (always `[1, 2, 3]`).                                                                                                                                                                          |
-| 8   | 64  | Authorize idTag            | service `ocpp.authorize_id_token`                | `{charge_point_id, id_token, device_id?}` — `charge_point_id` alone is ambiguous if two loaded instances happen to see the same `chargePointId`; the optional `device_id` (charge point's or a connector's device) disambiguates which instance to query. `{"authorized": bool, "status": "accepted"\|"blocked"\|"expired"\|"invalid"}`. OCPP's authorization provider never returns `"unknown"`. |
+| 8   | 64  | Authorize idTag            | service `ocpp16.authorize_id_token`              | `{charge_point_id, id_token, device_id?}` — `charge_point_id` alone is ambiguous if two loaded instances happen to see the same `chargePointId`; the optional `device_id` (charge point's or a connector's device) disambiguates which instance to query. `{"authorized": bool, "status": "accepted"\|"blocked"\|"expired"\|"invalid"}`. OCPP's authorization provider never returns `"unknown"`. |
 | 9   | 128 | Start/release              | **not offered**                                  | See below.                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### State mapping
@@ -121,7 +121,7 @@ charge point defers the change until charging stops. OCPP surfaces this as
 `last_change_status: "Scheduled"` and `change_pending: true` on the availability switch's
 attributes, but the switch's actual `on`/`off` **state comes exclusively from the next
 `StatusNotification`**, never synthesized from the `ChangeAvailability` response. A
-load-management integration that calls `ocpp.change_configuration`-adjacent availability changes
+load-management integration that calls `ocpp16.change_configuration`-adjacent availability changes
 should watch for `change_pending` clearing (or the state itself flipping), not assume the change
 already took effect.
 
@@ -134,14 +134,14 @@ because 1–6 and 8 do; it should check the bitmask.
 
 ## Services and entities outside this contract
 
-`ocpp.reset`, `ocpp.unlock_connector`, `ocpp.get_configuration`, `ocpp.change_configuration`,
-`ocpp.trigger_message`, and `ocpp.get_diagnostics` exist (see the main
+`ocpp16.reset`, `ocpp16.unlock_connector`, `ocpp16.get_configuration`, `ocpp16.change_configuration`,
+`ocpp16.trigger_message`, and `ocpp16.get_diagnostics` exist (see the main
 [README](../../README.md)) but are **not** part of the numbered capability contract above — they
 were added as a separate scope decision (see `DECISIONS.md`) because the underlying OCPP calls
 already existed in `core/`, not because REQ-0035 calls for them. A load-management integration can
 use them, but should not treat their presence as guaranteed the way it can for capabilities 1–6
 and 8. The `button` entities (`button.reset`/`button.unlock_connector`) are dashboard-idiomatic
-wrappers around `ocpp.reset`(`"Soft"`)/`ocpp.unlock_connector` and carry the same status.
+wrappers around `ocpp16.reset`(`"Soft"`)/`ocpp16.unlock_connector` and carry the same status.
 
 The same applies to the `active_phases` sensor (`sensor`, `entity_key="active_phases"`): state is
 the count of currently-active phases (a `Current.Import` sample above zero), with per-phase
@@ -150,8 +150,8 @@ REQ-0035 capability — a load-management integration wanting per-phase current 
 should read this sensor's attributes directly rather than expecting a bitmask entry for it. The
 same is true of the `last_heartbeat` sensor (no REQ-0035 capability tracks heartbeat timing).
 
-`number.power_limit_w` is UI convenience over Fähigkeit 3/4 (`ocpp.set_power_limit`/
-`ocpp.clear_power_limit`), not a new capability of its own — it calls the same
+`number.power_limit_w` is UI convenience over Fähigkeit 3/4 (`ocpp16.set_power_limit`/
+`ocpp16.clear_power_limit`), not a new capability of its own — it calls the same
 `utils/interop.py` functions the services do. Its `native_value` is optimistic (the last
 successfully set/cleared value this session, restored across a HA restart via `RestoreNumber` —
 see `DECISIONS.md`), not a live re-read — a load-management integration that needs the charge

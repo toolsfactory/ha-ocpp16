@@ -51,7 +51,7 @@ automation:
       - trigger: time
         at: "22:00:00"
     action:
-      - action: ocpp.set_power_limit
+      - action: ocpp16.set_power_limit
         data:
           device_id: <connector device id>
           limit_w: 3700
@@ -61,7 +61,7 @@ automation:
       - trigger: time
         at: "06:00:00"
     action:
-      - action: ocpp.clear_power_limit
+      - action: ocpp16.clear_power_limit
         data:
           device_id: <connector device id>
 ```
@@ -107,7 +107,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: ocpp
+          integration: ocpp16
     notify_target:
       name: Notification service
       default: notify.notify
@@ -186,4 +186,4 @@ first transaction.
 - [Configuration Reference](./CONFIGURATION.md) - All configuration options and the full service reference
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
 - [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
-- [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues) - Report problems
+- [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues) - Report problems

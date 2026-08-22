@@ -1,4 +1,4 @@
-"""Tests for `OcppCoordinator`: it republishes `QueryService` events, nothing more.
+"""Tests for `Ocpp16Coordinator`: it republishes `QueryService` events, nothing more.
 
 Per the plan's "thin coordinator" decision, the coordinator holds only the last
 event -- entities keep reading `QueryService` directly. These tests exercise
@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.core.domain.models import StateChangeEvent
+from custom_components.ocpp16.core.domain.models import StateChangeEvent
 from homeassistant.core import HomeAssistant
 
 CHARGE_POINT_ID = "CP001"

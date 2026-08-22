@@ -31,9 +31,9 @@ written for the common case where the coordinator's fetch _is_ the expensive ope
 sharing across entities. Here it is not: there is nothing to fetch, and nothing to poll
 (`iot_class: local_push`).
 
-**Decision:** `OcppCoordinator(DataUpdateCoordinator[StateChangeEvent | None])`,
+**Decision:** `Ocpp16Coordinator(DataUpdateCoordinator[StateChangeEvent | None])`,
 `update_interval=None`. The coordinator holds only the most recently published `StateChangeEvent`,
-not a materialized copy of any domain state. Entities extend `CoordinatorEntity[OcppCoordinator]`
+not a materialized copy of any domain state. Entities extend `CoordinatorEntity[Ocpp16Coordinator]`
 for lifecycle/`available` plumbing and re-render triggers, but read `QueryService`/
 `CommandService` directly in their property getters — exactly as they would without a coordinator
 at all.
@@ -43,7 +43,7 @@ at all.
 - Materializing a second `.data` snapshot from `QueryService` would just be a synchronization
   liability (two copies of the same state, no benefit) with no read ever actually reading it.
 - The event still buys the one thing a coordinator is for here: entities that only care about
-  their own connector (e.g. `OcppEffectivePowerLimitSensor`) can filter by `event.connector_id`
+  their own connector (e.g. `Ocpp16EffectivePowerLimitSensor`) can filter by `event.connector_id`
   before doing an OCPP round trip (`GetCompositeSchedule`), instead of refreshing on every event
   for every connector.
 - Confirmed explicitly with the maintainer as a deliberate, narrower reading of the "coordinator
@@ -65,7 +65,7 @@ at all.
 
 **Date:** 2026-08-18
 
-**Context:** `__init__.py` originally constructed `OcppCoordinator` (which subscribes on
+**Context:** `__init__.py` originally constructed `Ocpp16Coordinator` (which subscribes on
 `app.query_service`) before subscribing its own charge-point device-registration listener.
 `EventBus.publish()` calls listeners in subscription order, and
 `DataUpdateCoordinator.async_set_updated_data()` triggers the coordinator's _own_ listeners
@@ -77,7 +77,7 @@ unnoticed through several rounds of `--level error`-only log checks until a coor
 test caught it directly.
 
 **Decision:** Subscribe the device-registration listener on `app.query_service` before
-constructing `OcppCoordinator` in `async_setup_entry()`.
+constructing `Ocpp16Coordinator` in `async_setup_entry()`.
 
 **Rationale:** Subscription order is the only lever available — `EventBus` has no priority
 concept, and adding one for a single ordering dependency would be over-engineering for a
@@ -118,7 +118,7 @@ changed without disruption; the authorization file path and default idTag are op
 settings a user may reasonably want to change without recreating the entry.
 
 **Decision:** `host`/`port` live in `entry.data`. `authorization_file`/`default_id_tag` live in
-`entry.options`, editable via `OcppOptionsFlow` without removing the entry. Changing them fires an
+`entry.options`, editable via `Ocpp16OptionsFlow` without removing the entry. Changing them fires an
 options-update listener that reloads the entry (`CentralSystemApp` builds both from the loaded
 config once, at setup).
 
@@ -162,15 +162,15 @@ misrouting the call.
 by an `EntityDescription.value_fn` per logical group, with per-group files holding descriptions
 only (see `ha-entity-platform`).
 
-**Decision:** Each OCPP entity (`OcppChargePointStateSensor`, `OcppCurrentPowerSensor`,
-`OcppEffectivePowerLimitSensor`, `OcppMeasurandSensor`, and the two switches) is its own class with
-its own `native_value`/`is_on` logic, sharing only `OcppConnectorEntity` (device info, unique ID,
+**Decision:** Each OCPP entity (`Ocpp16ChargePointStateSensor`, `Ocpp16CurrentPowerSensor`,
+`Ocpp16EffectivePowerLimitSensor`, `Ocpp16MeasurandSensor`, and the two switches) is its own class with
+its own `native_value`/`is_on` logic, sharing only `Ocpp16ConnectorEntity` (device info, unique ID,
 `available`).
 
 **Rationale:** `value_fn` earns its keep when several entities are otherwise a copy of each other
-with a different lookup — that isn't true here. `OcppEffectivePowerLimitSensor` makes its own OCPP
-call and caches the result; `OcppMeasurandSensor` is dynamically instantiated per reported
-measurand with per-instance unit/device-class resolution; `OcppChargePointStateSensor` maps a raw
+with a different lookup — that isn't true here. `Ocpp16EffectivePowerLimitSensor` makes its own OCPP
+call and caches the result; `Ocpp16MeasurandSensor` is dynamically instantiated per reported
+measurand with per-instance unit/device-class resolution; `Ocpp16ChargePointStateSensor` maps a raw
 OCPP status through a five-value model plus REQ-0035 discovery attributes. Forcing these into one
 parameterized class would make the parameterization the complex part.
 
@@ -221,14 +221,14 @@ behavior is unchanged, so callers who need disambiguation now have a way to get 
 
 **Date:** 2026-08-19
 
-**Context:** `OcppCurrentPowerSensor` overrode `available` to return `False` whenever no matching
+**Context:** `Ocpp16CurrentPowerSensor` overrode `available` to return `False` whenever no matching
 `MeterValues` sample had arrived yet — even while the charge point was fully connected and
 otherwise healthy. Home Assistant's own convention reserves `unavailable` for "cannot reach the
 device at all" and uses `unknown` for "reachable, but no value yet" (state class sensors return
 `None` from `native_value` for the latter, which HA renders as `unknown` automatically).
 
 **Decision:** Removed the `available` override; the sensor now falls back to
-`OcppConnectorEntity`'s online-only availability check, so it renders `unknown` until the first
+`Ocpp16ConnectorEntity`'s online-only availability check, so it renders `unknown` until the first
 `Power.Active.Import` sample is reported.
 
 **Rationale:** Matches HA convention and what an automation author expects: `unavailable` should
@@ -256,7 +256,7 @@ total).
 
 **Rationale:** This is what made the new Active Phases sensor possible at all — it reads all three
 phases' `Current.Import` samples independently — and it was silently losing L1/L2 data for anyone
-already relying on per-phase `OcppMeasurandSensor` entities.
+already relying on per-phase `Ocpp16MeasurandSensor` entities.
 
 **Consequences:** None externally visible beyond the fix itself — this is additive precision, not
 a shape change to any existing entity's state or attributes.
@@ -267,7 +267,7 @@ a shape change to any existing entity's state or attributes.
 
 **Date:** 2026-08-19
 
-**Context:** `OcppMeasurandSensor` is created dynamically for every measurand a charge point
+**Context:** `Ocpp16MeasurandSensor` is created dynamically for every measurand a charge point
 actually reports, including ones outside `_MEASURAND_META` that OCPP does not recognize well
 enough to assign a `device_class`/`state_class` to. Every one of them appeared enabled by default,
 regardless of how common or useful it actually is (Quality Scale rule
@@ -351,11 +351,11 @@ checked for a raised error to detect failure needs no changes at all.
 
 ---
 
-### `ocpp.trigger_message` returns `Rejected`/`NotImplemented` as data, not an exception
+### `ocpp16.trigger_message` returns `Rejected`/`NotImplemented` as data, not an exception
 
 **Date:** 2026-08-20
 
-**Context:** `ocpp.trigger_message` (OCPP `TriggerMessage.req`) is not a REQ-0035 contract
+**Context:** `ocpp16.trigger_message` (OCPP `TriggerMessage.req`) is not a REQ-0035 contract
 capability — it was added alongside the heartbeat sensor and reset/unlock buttons as a separate
 scope decision (see "Expose Reset/UnlockConnector/GetConfiguration/ChangeConfiguration as HA
 services" above). Confirmed with the maintainer before implementation: unlike `set_power_limit`/
@@ -388,8 +388,8 @@ behavior; this entry is the decision record those pages were missing a link to.
 in `number/power_limit.py`'s own docstring and `INTEROP_CONTRACT.md`) — it shows the last value
 successfully set this session, not a live `GetCompositeSchedule` read. Before this decision, a HA
 restart reset that in-memory value to `unknown` every time, even if a limit was actively in effect
-on the charge point. `COMPARISON_LBBRHZN_OCPP.md`'s Phase 4 flagged this as an open decision gate:
-is a possibly-stale restored value more useful than `unknown`, given the charge point could have
+on the charge point. This raised an open decision gate: is a possibly-stale restored value more
+useful than `unknown`, given the charge point could have
 had its limit changed outside of Home Assistant while it was down?
 
 **Decision:** Restore the last successfully set value via Home Assistant's built-in `RestoreNumber`
@@ -416,8 +416,8 @@ this decision, only the "unknown after every restart" annoyance is fixed.
 
 **Date:** 2026-08-21
 
-**Context:** `COMPARISON_LBBRHZN_OCPP.md`'s Phase 5 flagged direct `wss://` support as a candidate
-feature, gated on confirmed user need. The obvious-looking alternative — "put a reverse proxy in
+**Context:** Direct `wss://` support was flagged as a candidate feature, gated on confirmed user
+need. The obvious-looking alternative — "put a reverse proxy in
 front, like Home Assistant's own web UI already gets" — does not actually transfer: Home
 Assistant's web UI is proxied via ordinary HTTP virtual-host `proxy_pass` (the near-universal case
 for self-hosted setups), but a charge point is not an HTTP client with a hostname — it connects
@@ -489,7 +489,7 @@ the cheapest this will ever be.
     under `custom_components/` shared a name with a real dependency; actively breaking now, causing
     a spurious "partially initialized module" circular-import error the moment anything imported the
     real `ocpp` library. Fixed by putting the repository root on `PYTHONPATH` instead, so
-    `custom_components.ocpp` resolves as a namespace package without shadowing the dependency.
+    `custom_components.ocpp16` resolves as a namespace package without shadowing the dependency.
   - `script/clean`'s "uninstall an accidentally self-installed package" cleanup matched by bare
     package name alone (`pip show <domain>`) — safe when nothing under `custom_components/` could
     collide with a real dependency, but now uninstalling the genuine `ocpp` library on every run
@@ -505,10 +505,10 @@ the cheapest this will ever be.
 **Date:** 2026-08-21
 
 **Context:** `last_transaction_id`, `session_duration_s`, `session_energy_wh`, `last_stop_reason`,
-and `reconnect_count` (added in Phase 3, see `COMPARISON_LBBRHZN_OCPP.md`) all read from the
-in-memory domain layer (`TransactionManager`/`ChargePointRegistryStore`), which has never persisted
-anything across a restart and still doesn't. The 2026-08-21 recheck flagged this as an explicit,
-undecided gate rather than assuming the reset-to-`unknown` behavior was acceptable by default.
+and `reconnect_count` all read from the in-memory domain layer (`TransactionManager`/
+`ChargePointRegistryStore`), which has never persisted anything across a restart and still doesn't.
+A 2026-08-21 recheck flagged this as an explicit, undecided gate rather than assuming the
+reset-to-`unknown` behavior was acceptable by default.
 
 **Decision:** Restore each sensor's last known value via
 `homeassistant.components.sensor.RestoreSensor` (the sensor-platform sibling of
@@ -548,13 +548,55 @@ of these 5 values is already exposed through exactly one live read path
 
 ---
 
+### Renamed domain again: `ocpp` → `ocpp16`
+
+**Date:** 2026-08-22
+
+**Context:** The domain has been `ocpp` since the previous rename (see "Project identity renamed
+from OCCP to OCPP" above). That collides with `lbbrhzn/ocpp`, an existing, unrelated, widely-used
+Home Assistant integration that already occupies the `ocpp` domain in the HACS/HA ecosystem — the
+same integration this project's now-removed comparison document benchmarked against. This project
+only implements OCPP 1.6 (not 2.x), so the domain is available to name that specifically.
+
+**Decision:** Renamed everywhere: domain `ocpp` → `ocpp16`, class prefix `Ocpp` → `Ocpp16`, GitHub
+repository `toolsfactory/ocpp-ha` → `toolsfactory/ha-ocpp16`. Mechanical, via a scripted
+substitution pass across every tracked file, following the same approach as the first rename. Title
+stays `OCPP 1.6 Central System` — it names the protocol, not the domain. The existing inner package
+`core/ocpp16/` (the OCPP-1.6 protocol wrapper) keeps its name unchanged; the outer package becoming
+`custom_components/ocpp16/` makes the full path `custom_components/ocpp16/core/ocpp16/` — repetitive
+but not a real collision, since the two segments mean different things (this integration's identity
+vs. "wraps OCPP 1.6 specifically").
+
+**Rationale:**
+
+- A domain collision with a well-known integration is a permanent hazard for anyone with both
+  installed, not a cosmetic issue — HACS and Home Assistant identify integrations by domain string.
+- The project only ever implements OCPP 1.6, so `ocpp16` is both more specific and permanently
+  collision-free against a hypothetical future `ocpp20`/`ocpp201` integration too.
+- Pre-1.0, same reasoning as the first rename: this is the cheapest this will ever be.
+
+**Consequences:**
+
+- **The same "no migration possible" property as the first rename.** A config entry belongs
+  permanently to the domain string that created it; every entry loaded under `ocpp` (including the
+  development instance used throughout this project) must be deleted and re-added under `ocpp16`
+  from scratch.
+- `docs/development/COMPARISON_LBBRHZN_OCPP.md` — the comparison document that first surfaced this
+  collision — is removed entirely, along with every reference to it and to the other integration by
+  name, now that its recommendations are already implemented.
+- The GitHub repository rename leaves the old `toolsfactory/ocpp-ha` URL as a redirect, not a live
+  repository; existing clones' `origin` remote keeps working through that redirect but was not
+  rewritten by this change.
+
+---
+
 ## Future Considerations
 
 ### State Restoration
 
 **Status:** Not yet implemented
 
-`OcppAvailabilitySwitch`'s `_last_change_status` attribute (the pending `ChangeAvailability`
+`Ocpp16AvailabilitySwitch`'s `_last_change_status` attribute (the pending `ChangeAvailability`
 status) does not survive a Home Assistant restart. Low priority — the connector's actual on/off
 state always comes fresh from the charge point's next `StatusNotification`.
 
@@ -603,7 +645,7 @@ or grant that access.
 
 **Status:** Local assets satisfy the Quality Scale rule; external HACS registration still outstanding
 
-The developer provided a full local brand asset set (`custom_components/ocpp/brand/`:
+The developer provided a full local brand asset set (`custom_components/ocpp16/brand/`:
 `icon`/`logo`/`dark_icon`/`dark_logo`, each with an `@2x` variant) during the 2026-08-20 rename
 session — `homeassistant.loader.Integration.has_branding` recognizes a local `brand/` folder shipped
 inside the integration itself. **These two things are separate and must not be conflated (a prior

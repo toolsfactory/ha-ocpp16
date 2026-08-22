@@ -1,4 +1,4 @@
-"""Shared fixtures for the ocpp tests."""
+"""Shared fixtures for the ocpp16 tests."""
 
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
@@ -12,10 +12,10 @@ from cryptography.x509.oid import NameOID
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.ocpp.core.app import CentralSystemApp
-from custom_components.ocpp.core.domain.commands import ChargingSchedulePeriodInfo, CompositeScheduleResult
-from custom_components.ocpp.core.domain.models import MeterSample, StateChangeEvent
+from custom_components.ocpp16.const import CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp16.core.app import CentralSystemApp
+from custom_components.ocpp16.core.domain.commands import ChargingSchedulePeriodInfo, CompositeScheduleResult
+from custom_components.ocpp16.core.domain.models import MeterSample, StateChangeEvent
 from homeassistant.core import HomeAssistant
 
 CHARGE_POINT_ID = "CP001"
@@ -30,8 +30,8 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
 def mock_app_start_stop() -> Generator[None]:
     """Patch `CentralSystemApp.start`/`stop` so setup never binds a real socket."""
     with (
-        patch("custom_components.ocpp.core.app.CentralSystemApp.start", new_callable=AsyncMock),
-        patch("custom_components.ocpp.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
+        patch("custom_components.ocpp16.core.app.CentralSystemApp.start", new_callable=AsyncMock),
+        patch("custom_components.ocpp16.core.app.CentralSystemApp.stop", new_callable=AsyncMock),
     ):
         yield
 

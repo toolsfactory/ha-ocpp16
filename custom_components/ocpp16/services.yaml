@@ -1,0 +1,145 @@
+set_power_limit:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    limit_w:
+      required: true
+      selector:
+        number:
+          min: 0.01
+          unit_of_measurement: "W"
+          mode: box
+    phases:
+      required: false
+      selector:
+        select:
+          options: ["1", "2", "3"]
+
+clear_power_limit:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+
+authorize_id_token:
+  fields:
+    charge_point_id:
+      required: true
+      selector:
+        text:
+    id_token:
+      required: true
+      selector:
+        text:
+    device_id:
+      required: false
+      selector:
+        device:
+          integration: ocpp16
+
+reset:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    reset_type:
+      required: true
+      selector:
+        select:
+          options: ["Soft", "Hard"]
+
+unlock_connector:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+
+get_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    keys:
+      required: false
+      selector:
+        text:
+          multiple: true
+
+change_configuration:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    key:
+      required: true
+      selector:
+        text:
+    value:
+      required: true
+      selector:
+        text:
+
+trigger_message:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    requested_message:
+      required: true
+      selector:
+        select:
+          options:
+            - "BootNotification"
+            - "DiagnosticsStatusNotification"
+            - "FirmwareStatusNotification"
+            - "Heartbeat"
+            - "MeterValues"
+            - "StatusNotification"
+
+get_diagnostics:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: ocpp16
+    location:
+      required: true
+      selector:
+        text:
+    retries:
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+    retry_interval:
+      required: false
+      selector:
+        number:
+          min: 0
+          unit_of_measurement: "s"
+          mode: box
+    start_time:
+      required: false
+      selector:
+        text:
+    stop_time:
+      required: false
+      selector:
+        text:

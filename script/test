@@ -61,7 +61,7 @@ done
 # pytest is expected to already be on PATH via script/setup/bootstrap (HA's own
 # requirements_test.txt) -- there is no "test" extra in pyproject.toml to fall back to, and a
 # broken editable-install fallback here previously left `ocpp` itself importable, which can
-# shadow `custom_components.ocpp` in Home Assistant's loader.
+# shadow `custom_components.ocpp16` in Home Assistant's loader.
 if ! python -c "import pytest" 2>/dev/null; then
     log_error "pytest not found. Run: script/setup/bootstrap"
     exit 1

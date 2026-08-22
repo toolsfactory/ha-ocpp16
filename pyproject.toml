@@ -11,10 +11,10 @@ version = "0.0.0"              # Version is managed in manifest.json only
 requires-python = ">=3.14"
 
 [tool.setuptools]
-packages = ["custom_components.ocpp"]
+packages = ["custom_components.ocpp16"]
 
 [tool.pyright]
-include = ["custom_components/ocpp"]
+include = ["custom_components/ocpp16"]
 exclude = [
     "**/.*",
     "**/__pycache__",
@@ -57,12 +57,12 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["custom_components/ocpp"]
+source = ["custom_components/ocpp16"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
-# Decision 2026-08-21 (see docs/development/COMPARISON_LBBRHZN_OCPP.md, Phase 1): 90%, not
-# lbbrhzn/ocpp's unsubstantiated 95% figure. Increase-only -- never lower this to make a drop pass.
+# Decision 2026-08-21 (see docs/development/DECISIONS.md): a deliberate, evidence-based 90%, not
+# an arbitrary round number. Increase-only -- never lower this to make a drop pass.
 fail_under = 90
 exclude_lines = [
     "pragma: no cover",
@@ -248,7 +248,7 @@ split-on-trailing-comma = false
     "T20",    # print() allowed in scripts
     "INP001", # Implicit namespace package (scripts are not a package)
 ]
-"custom_components/ocpp/core/console.py" = [
+"custom_components/ocpp16/core/console.py" = [
     "T20", # print() is this file's actual output mechanism (interactive prompt_toolkit console)
 ]
 "tests/*" = [

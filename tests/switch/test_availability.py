@@ -1,11 +1,11 @@
-"""Tests for `OcppAvailabilitySwitch` (Fähigkeit 6, REQ-0021, ADR-0009)."""
+"""Tests for `Ocpp16AvailabilitySwitch` (Fähigkeit 6, REQ-0021, ADR-0009)."""
 
 from collections.abc import Callable
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import DOMAIN
-from custom_components.ocpp.entity_utils.device import connector_identifier
+from custom_components.ocpp16.const import DOMAIN
+from custom_components.ocpp16.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 

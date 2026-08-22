@@ -2,10 +2,10 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from custom_components.ocpp.core.__main__ import main
-from custom_components.ocpp.core.config import AppConfig
+from custom_components.ocpp16.core.__main__ import main
+from custom_components.ocpp16.core.config import AppConfig
 
-_MODULE = "custom_components.ocpp.core.__main__"
+_MODULE = "custom_components.ocpp16.core.__main__"
 
 
 def test_main_builds_and_runs_the_app_from_parsed_args() -> None:

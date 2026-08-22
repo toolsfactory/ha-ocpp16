@@ -1,1 +1,1 @@
-"""Tests for the ocpp switch platform."""
+"""Tests for the ocpp16 switch platform."""

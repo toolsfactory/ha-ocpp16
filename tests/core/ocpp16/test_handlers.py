@@ -21,16 +21,16 @@ from unittest.mock import AsyncMock
 from ocpp.v16 import call_result as ocpp_call_result, enums as ocpp_enums
 import pytest
 
-from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
-from custom_components.ocpp.core.domain.commands import ChargePointCallRejectedError
-from custom_components.ocpp.core.domain.connector_state import ConnectorStateStore
-from custom_components.ocpp.core.domain.events import EventBus
-from custom_components.ocpp.core.domain.meter_values import MeterValueStore
-from custom_components.ocpp.core.domain.models import StateChangeEvent
-from custom_components.ocpp.core.domain.registry import ChargePointRegistryStore
-from custom_components.ocpp.core.domain.transactions import TransactionManager
-from custom_components.ocpp.core.logging_setup import get_charge_point_logger
-from custom_components.ocpp.core.ocpp16.handlers import (
+from custom_components.ocpp16.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
+from custom_components.ocpp16.core.domain.commands import ChargePointCallRejectedError
+from custom_components.ocpp16.core.domain.connector_state import ConnectorStateStore
+from custom_components.ocpp16.core.domain.events import EventBus
+from custom_components.ocpp16.core.domain.meter_values import MeterValueStore
+from custom_components.ocpp16.core.domain.models import StateChangeEvent
+from custom_components.ocpp16.core.domain.registry import ChargePointRegistryStore
+from custom_components.ocpp16.core.domain.transactions import TransactionManager
+from custom_components.ocpp16.core.logging_setup import get_charge_point_logger
+from custom_components.ocpp16.core.ocpp16.handlers import (
     ChargePointHandler,
     HandlerServices,
     _expect_response,

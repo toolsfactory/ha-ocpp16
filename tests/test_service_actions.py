@@ -7,17 +7,20 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 import voluptuous as vol
 
-from custom_components.ocpp.const import CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.ocpp.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
-from custom_components.ocpp.core.domain.commands import ChargePointCallRejectedError
-from custom_components.ocpp.entity_utils.device import charge_point_identifier, connector_identifier
-from custom_components.ocpp.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
-from custom_components.ocpp.service_actions.configuration import SERVICE_CHANGE_CONFIGURATION, SERVICE_GET_CONFIGURATION
-from custom_components.ocpp.service_actions.get_diagnostics import SERVICE_GET_DIAGNOSTICS
-from custom_components.ocpp.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
-from custom_components.ocpp.service_actions.reset import SERVICE_RESET
-from custom_components.ocpp.service_actions.trigger_message import SERVICE_TRIGGER_MESSAGE
-from custom_components.ocpp.service_actions.unlock_connector import SERVICE_UNLOCK_CONNECTOR
+from custom_components.ocpp16.const import CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp16.core.domain.authorization import StaticAuthorizationProvider, StaticIdTagEntry
+from custom_components.ocpp16.core.domain.commands import ChargePointCallRejectedError
+from custom_components.ocpp16.entity_utils.device import charge_point_identifier, connector_identifier
+from custom_components.ocpp16.service_actions.authorize_id_token import SERVICE_AUTHORIZE_ID_TOKEN
+from custom_components.ocpp16.service_actions.configuration import (
+    SERVICE_CHANGE_CONFIGURATION,
+    SERVICE_GET_CONFIGURATION,
+)
+from custom_components.ocpp16.service_actions.get_diagnostics import SERVICE_GET_DIAGNOSTICS
+from custom_components.ocpp16.service_actions.power_limit import SERVICE_CLEAR_POWER_LIMIT, SERVICE_SET_POWER_LIMIT
+from custom_components.ocpp16.service_actions.reset import SERVICE_RESET
+from custom_components.ocpp16.service_actions.trigger_message import SERVICE_TRIGGER_MESSAGE
+from custom_components.ocpp16.service_actions.unlock_connector import SERVICE_UNLOCK_CONNECTOR
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr

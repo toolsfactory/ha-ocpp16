@@ -42,7 +42,7 @@ With no file configured, OCPP's authorization provider has an empty allow-list, 
 `Invalid` (`core/domain/authorization.py`'s `StaticAuthorizationProvider.authorize()` returns
 `Invalid` for any tag not found in its entries — an empty provider has none). Set an authorization
 file listing at least the `Default idTag` if you want the `start_stop` switch or
-`ocpp.authorize_id_token` to work at all.
+`ocpp16.authorize_id_token` to work at all.
 
 ### TLS Certificate (`wss://`)
 
@@ -144,7 +144,7 @@ or the device selector Home Assistant's service UI offers for these fields autom
 [INTEROP_CONTRACT.md](../development/INTEROP_CONTRACT.md) for the full machine-readable contract
 if you're building another integration against these.
 
-### `ocpp.set_power_limit`
+### `ocpp16.set_power_limit`
 
 Set a connector's charging power limit.
 
@@ -155,29 +155,29 @@ Set a connector's charging power limit.
 | `phases`    | No       | Number of phases (1–3)     |
 
 ```yaml
-action: ocpp.set_power_limit
+action: ocpp16.set_power_limit
 data:
   device_id: <connector device id>
   limit_w: 7400
   phases: 3
 ```
 
-### `ocpp.clear_power_limit`
+### `ocpp16.clear_power_limit`
 
 Remove a connector's charging power limit.
 
 ```yaml
-action: ocpp.clear_power_limit
+action: ocpp16.clear_power_limit
 data:
   device_id: <connector device id>
 ```
 
-### `ocpp.authorize_id_token`
+### `ocpp16.authorize_id_token`
 
 Check whether an idTag is authorized, without starting a transaction.
 
 ```yaml
-action: ocpp.authorize_id_token
+action: ocpp16.authorize_id_token
 data:
   charge_point_id: CP001
   id_token: TAG001
@@ -189,7 +189,7 @@ which is not guaranteed to be the one you meant. Add `device_id` (the charge poi
 connector's device) to resolve it unambiguously instead:
 
 ```yaml
-action: ocpp.authorize_id_token
+action: ocpp16.authorize_id_token
 data:
   charge_point_id: CP001
   id_token: TAG001
@@ -199,51 +199,51 @@ data:
 If you only ever run a single OCPP instance, or are certain no two instances share a
 `chargePointId`, omitting `device_id` is fine — it exists specifically for the multi-instance case.
 
-### `ocpp.reset`
+### `ocpp16.reset`
 
 Soft- or hard-reset the charge point.
 
 ```yaml
-action: ocpp.reset
+action: ocpp16.reset
 data:
   device_id: <charge point device id>
   reset_type: Soft
 ```
 
-### `ocpp.unlock_connector`
+### `ocpp16.unlock_connector`
 
 Ask the charge point to unlock a connector.
 
 ```yaml
-action: ocpp.unlock_connector
+action: ocpp16.unlock_connector
 data:
   device_id: <connector device id>
 ```
 
-### `ocpp.get_configuration`
+### `ocpp16.get_configuration`
 
 Read one or more OCPP configuration keys (all of them if `keys` is omitted).
 
 ```yaml
-action: ocpp.get_configuration
+action: ocpp16.get_configuration
 data:
   device_id: <charge point device id>
   keys: [HeartbeatInterval]
 ```
 
-### `ocpp.change_configuration`
+### `ocpp16.change_configuration`
 
 Set a single OCPP configuration key.
 
 ```yaml
-action: ocpp.change_configuration
+action: ocpp16.change_configuration
 data:
   device_id: <charge point device id>
   key: HeartbeatInterval
   value: "300"
 ```
 
-### `ocpp.trigger_message`
+### `ocpp16.trigger_message`
 
 Ask the charge point to resend a specific OCPP message (`BootNotification`,
 `DiagnosticsStatusNotification`, `FirmwareStatusNotification`, `Heartbeat`, `MeterValues`, or
@@ -252,13 +252,13 @@ data rather than raised as an error — it doesn't change any charge-point state
 rather than a failure.
 
 ```yaml
-action: ocpp.trigger_message
+action: ocpp16.trigger_message
 data:
   device_id: <charge point device id>
   requested_message: StatusNotification
 ```
 
-### `ocpp.get_diagnostics`
+### `ocpp16.get_diagnostics`
 
 Ask the charge point to upload a diagnostics file to a location you provide (an FTP or HTTP(S)
 server you operate). OCPP 1.6 defines no accept/reject status for this call, so a successful call
@@ -266,7 +266,7 @@ always returns `{"file_name": ...}` (`file_name` may be `null` -- the charge poi
 know it yet).
 
 ```yaml
-action: ocpp.get_diagnostics
+action: ocpp16.get_diagnostics
 data:
   device_id: <charge point device id>
   location: ftp://ops.example.com/diagnostics/
@@ -283,7 +283,7 @@ automation:
       - trigger: time
         at: "22:00:00"
     action:
-      - action: ocpp.set_power_limit
+      - action: ocpp16.set_power_limit
         data:
           device_id: <connector device id>
           limit_w: 3700
@@ -351,7 +351,7 @@ blueprint:
       selector:
         entity:
           domain: sensor
-          integration: ocpp
+          integration: ocpp16
     notify_target:
       name: Notification service
       default: notify.notify
@@ -400,4 +400,4 @@ If configuration changes aren't persisted:
 - [Examples](./EXAMPLES.md) - Automation and dashboard examples
 - [Supported Devices](./SUPPORTED_DEVICES.md) - Real-hardware compatibility results (currently empty — no device validated yet)
 - [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
-- [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues) - Report problems
+- [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues) - Report problems

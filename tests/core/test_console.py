@@ -15,10 +15,10 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 import pytest
 
-from custom_components.ocpp.core.app import CentralSystemApp
-from custom_components.ocpp.core.config import AppConfig
-from custom_components.ocpp.core.console import _dispatch, _help_text, run_console
-from custom_components.ocpp.core.domain.commands import CompositeScheduleResult
+from custom_components.ocpp16.core.app import CentralSystemApp
+from custom_components.ocpp16.core.config import AppConfig
+from custom_components.ocpp16.core.console import _dispatch, _help_text, run_console
+from custom_components.ocpp16.core.domain.commands import CompositeScheduleResult
 
 CHARGE_POINT_ID = "CP001"
 

@@ -8,15 +8,13 @@ This custom integration uses multiple requirements files to separate different t
 
 **Purpose:** Python packages needed by the integration at runtime
 **Installed by:** Home Assistant when loading the integration
-**Also defined in:** `custom_components/ocpp/manifest.json`
+**Also defined in:** `custom_components/ocpp16/manifest.json`
 
-**Note:** This file is typically empty if this integration has no additional runtime dependencies beyond Home Assistant core.
-
-**Example:**
+**This integration's actual contents:**
 
 ```txt
-aiohttp>=3.8.0
-async-timeout>=4.0.0
+ocpp>=2.1,<3.0
+websockets>=13,<18
 ```
 
 ### `package.json` - Node.js Development Tools
@@ -64,7 +62,7 @@ async-timeout>=4.0.0
 
 ```json
 {
-  "requirements": ["aiohttp>=3.8.0"]
+  "requirements": ["ocpp>=2.1,<3.0", "websockets>=13,<18"]
 }
 ```
 
@@ -110,7 +108,8 @@ The `script/setup/bootstrap` automatically installs dependencies from multiple s
 
 ### From Home Assistant Core
 
-**Version:** Configured via `HA_VERSION` in `.devcontainer/devcontainer.json` (currently `2025.12.3`)
+**Version:** Read from `hacs.json`'s `homeassistant` field (currently `2026.8.0`), unless overridden by
+an `HA_VERSION` environment variable
 
 1. **Runtime dependencies** (`requirements_all.txt`)
    - All packages that Home Assistant integrations might need
@@ -145,8 +144,8 @@ This approach means this project only needs to maintain a minimal set of depende
 
 ```json
 {
-  "name": "Integration Name",
-  "homeassistant": "2025.11.0",
+  "name": "OCPP 1.6 Central System",
+  "homeassistant": "2026.8.0",
   "hacs": "2.0.5"
 }
 ```
@@ -159,7 +158,7 @@ This approach means this project only needs to maintain a minimal set of depende
 
 ```json
 {
-  "requirements": ["package>=1.0.0"]
+  "requirements": ["ocpp>=2.1,<3.0", "websockets>=13,<18"]
 }
 ```
 

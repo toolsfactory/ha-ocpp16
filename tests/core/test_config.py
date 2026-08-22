@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.ocpp.core.config import AppConfig, _parse_log_level, parse_args
+from custom_components.ocpp16.core.config import AppConfig, _parse_log_level, parse_args
 
 
 def test_parse_args_defaults() -> None:

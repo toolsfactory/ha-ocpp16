@@ -1,12 +1,12 @@
-"""Tests for `OcppResetButton`."""
+"""Tests for `Ocpp16ResetButton`."""
 
 from collections.abc import Callable
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import DOMAIN
-from custom_components.ocpp.entity_utils.device import charge_point_identifier
+from custom_components.ocpp16.const import DOMAIN
+from custom_components.ocpp16.entity_utils.device import charge_point_identifier
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er

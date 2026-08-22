@@ -66,8 +66,8 @@ without clobbering an initialized repository:
 
 | Placeholder     | Means                                                            | Example in this repo |
 | --------------- | ---------------------------------------------------------------- | -------------------- |
-| `<domain>`      | the integration domain, i.e. the `DOMAIN` constant in `const.py` | `ocpp`               |
-| `{ClassPrefix}` | the class name prefix used by every integration class            | `Ocpp`               |
+| `<domain>`      | the integration domain, i.e. the `DOMAIN` constant in `const.py` | `ocpp16`             |
+| `{ClassPrefix}` | the class name prefix used by every integration class            | `Ocpp16`             |
 
 Substitute them mentally against `const.py` and `manifest.json`; never write them literally into code.
 

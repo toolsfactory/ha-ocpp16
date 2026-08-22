@@ -89,15 +89,12 @@ Please read [`AI_POLICY.md`](./AI_POLICY.md) before submitting AI-assisted contr
 
 ## Code Quality
 
-This blueprint follows Home Assistant's [integration quality standards](https://developers.home-assistant.io/docs/core/integration-quality-scale/) as best practices. The code includes:
-
-- ✅ Comprehensive docstrings with links to official documentation
-- ✅ Full type hints for better IDE support
-- ✅ Config flow with reauthentication support
-- ✅ Proper error handling and entity unavailability
-- ✅ Coordinator pattern for efficient data fetching
-
-**Don't worry!** You don't need to maintain all of this. The blueprint gives you a solid, well-documented starting point. Feel free to simplify or adapt anything to your needs - the goal is to help you get started quickly with good patterns, not to overwhelm you with requirements.
+This project targets Silver/Gold on Home Assistant's [integration quality
+scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/): full type hints,
+async I/O throughout, proper error handling and entity unavailability, service actions registered in
+`async_setup()`, and redacted diagnostics. `script/lint`, `script/type-check`, and `script/hassfest`
+enforce the mechanical parts of this; `AGENTS.md` and `docs/development/ARCHITECTURE.md` cover the
+rest.
 
 ## Test your code modification
 

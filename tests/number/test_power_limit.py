@@ -1,12 +1,12 @@
-"""Tests for `OcppPowerLimitNumber`."""
+"""Tests for `Ocpp16PowerLimitNumber`."""
 
 from collections.abc import Callable
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, mock_restore_cache_with_extra_data
 
-from custom_components.ocpp.const import CONF_HOST, CONF_MAX_POWER_LIMIT_W, CONF_PORT, DOMAIN
-from custom_components.ocpp.entity_utils.device import connector_identifier
+from custom_components.ocpp16.const import CONF_HOST, CONF_MAX_POWER_LIMIT_W, CONF_PORT, DOMAIN
+from custom_components.ocpp16.entity_utils.device import connector_identifier
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er

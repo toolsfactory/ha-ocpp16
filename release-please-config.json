@@ -9,7 +9,7 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "custom_components/ocpp/manifest.json",
+          "path": "custom_components/ocpp16/manifest.json",
           "jsonpath": "$.version"
         }
       ],

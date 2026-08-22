@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import (
+from custom_components.ocpp16.const import (
     CONF_AUTHORIZATION_FILE,
     CONF_CERTIFICATE_PATH,
     CONF_DEFAULT_ID_TAG,
@@ -20,7 +20,7 @@ from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-_BIND_PATH = "custom_components.ocpp.config_flow_handler.config_flow._try_bind_port"
+_BIND_PATH = "custom_components.ocpp16.config_flow_handler.config_flow._try_bind_port"
 
 
 async def test_user_flow_creates_entry(hass: HomeAssistant, tmp_path) -> None:

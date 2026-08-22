@@ -62,9 +62,12 @@ run_hook "develop" "pre"
 ## directory itself would make every integration folder inside it (this one, and any other
 ## custom_components/<name>/) directly importable as a bare top-level package by that same
 ## name. That is silently harmless right up until an integration's domain collides with an
-## actual PyPI dependency's import name -- which "ocpp" (the domain) now does with the `ocpp`
-## library this integration depends on, causing Python to load the same code under two
-## unrelated module identities and fail with a spurious "circular import" error.
+## actual PyPI dependency's import name, causing Python to load the same code under two
+## unrelated module identities and fail with a spurious "circular import" error -- this
+## project's own domain used to be exactly that name ("ocpp", same as the `ocpp` library it
+## depends on) before it was renamed to "ocpp16", partly to remove this risk. The
+## repo-root-on-PYTHONPATH approach stays regardless, since a future dependency could collide
+## with any other integration folder name.
 export PYTHONPATH="${PYTHONPATH:-}:${PWD}"
 
 log_header "Starting Home Assistant in development mode"

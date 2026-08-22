@@ -140,4 +140,4 @@ logger:
     homeassistant.config_entries: info
 
     # Your integration debug logging - shows EVERYTHING from your integration
-    custom_components.ocpp: debug
+    custom_components.ocpp16: debug

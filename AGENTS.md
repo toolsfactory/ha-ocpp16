@@ -24,14 +24,14 @@ touch. See [`blueprint-tooling`](.agents/skills/blueprint-tooling/SKILL.md).
 
 **Identity — use these everywhere, never a variant:**
 
-- **Domain:** `ocpp`
+- **Domain:** `ocpp16`
 - **Title:** OCPP 1.6 Central System
-- **Class prefix:** `Ocpp`
-- **Repository:** toolsfactory/ocpp-ha
+- **Class prefix:** `Ocpp16`
+- **Repository:** toolsfactory/ha-ocpp16
 
 **Key directories:**
 
-- `custom_components/ocpp/` — integration code
+- `custom_components/ocpp16/` — integration code
 - `config/` — Home Assistant configuration for local testing
 - `tests/` — mirrors the integration structure
 - `script/` — development and validation scripts

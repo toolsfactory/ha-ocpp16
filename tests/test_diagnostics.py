@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ocpp.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
-from custom_components.ocpp.diagnostics import async_get_config_entry_diagnostics
+from custom_components.ocpp16.const import CONF_AUTHORIZATION_FILE, CONF_DEFAULT_ID_TAG, CONF_HOST, CONF_PORT, DOMAIN
+from custom_components.ocpp16.diagnostics import async_get_config_entry_diagnostics
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 

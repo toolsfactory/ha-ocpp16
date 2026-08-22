@@ -23,7 +23,7 @@ Assistant is the server, and charge points are the clients.
 2. Go to "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/toolsfactory/ocpp-ha`
+5. Add this repository URL: `https://github.com/toolsfactory/ha-ocpp16`
 6. Set category to "Integration"
 7. Click "Add"
 8. Find "OCPP 1.6 Central System" in the integration list
@@ -32,9 +32,9 @@ Assistant is the server, and charge points are the clients.
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/toolsfactory/ocpp-ha/releases)
-2. Extract the `ocpp` folder from the archive
-3. Copy it to `custom_components/ocpp/` in your Home Assistant configuration directory
+1. Download the latest release from the [releases page](https://github.com/toolsfactory/ha-ocpp16/releases)
+2. Extract the `ocpp16` folder from the archive
+3. Copy it to `custom_components/ocpp16/` in your Home Assistant configuration directory
 4. Restart Home Assistant
 
 ## Initial Setup
@@ -65,7 +65,7 @@ something else is rejected immediately with a clear error rather than failing la
 - **Authorization File:** Path to a JSON file with a static idTag allow-list (see
   [CONFIGURATION.md](./CONFIGURATION.md) for the format). **Leaving this empty rejects every
   idTag**, not the other way around — set it (listing at least your **Default idTag**, below) if
-  you want to remote-start a transaction or use `ocpp.authorize_id_token` at all.
+  you want to remote-start a transaction or use `ocpp16.authorize_id_token` at all.
 - **Default idTag:** The idTag OCPP uses when the `start_stop` switch remote-starts a transaction.
   Required only if you plan to use that switch — and must appear in the authorization file above,
   or the charge point will reject the transaction as unauthorized.
@@ -224,7 +224,7 @@ Enable debug logging to troubleshoot issues:
 logger:
   default: warning
   logs:
-    custom_components.ocpp: debug
+    custom_components.ocpp16: debug
 ```
 
 Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs for detailed information.
@@ -238,18 +238,18 @@ Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs f
 4. If you configured an idTag authorization file (outside the `config/` directory Home Assistant
    manages), it is left on disk untouched; delete it yourself if you no longer need it.
 5. To remove the integration entirely (all instances), also remove it via HACS or delete
-   `custom_components/ocpp/` if installed manually, then restart Home Assistant.
+   `custom_components/ocpp16/` if installed manually, then restart Home Assistant.
 
 ## Next Steps
 
 - See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options and the full service reference
 - See [EXAMPLES.md](./EXAMPLES.md) for more automation examples
 - See [SUPPORTED_DEVICES.md](./SUPPORTED_DEVICES.md) for real-hardware results (help wanted — none validated yet)
-- Report issues at [GitHub Issues](https://github.com/toolsfactory/ocpp-ha/issues)
+- Report issues at [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues)
 
 ## Support
 
 For help and discussion:
 
-- [GitHub Discussions](https://github.com/toolsfactory/ocpp-ha/discussions)
+- [GitHub Discussions](https://github.com/toolsfactory/ha-ocpp16/discussions)
 - [Home Assistant Community Forum](https://community.home-assistant.io/)
