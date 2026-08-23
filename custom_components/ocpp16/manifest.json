@@ -1,12 +1,17 @@
 {
   "domain": "ocpp16",
   "name": "OCPP 1.6 Central System",
-  "codeowners": ["@toolsfactory"],
+  "codeowners": [
+    "@toolsfactory"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/toolsfactory/ha-ocpp16",
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/toolsfactory/ha-ocpp16/issues",
-  "requirements": ["ocpp>=2.1,<3.0", "websockets>=13,<18"],
-  "version": "0.1.0"
+  "requirements": [
+    "ocpp>=2.1,<3.0",
+    "websockets>=13,<18"
+  ],
+  "version": "0.2.0"
 }
