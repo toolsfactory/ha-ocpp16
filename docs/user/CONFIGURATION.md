@@ -398,6 +398,7 @@ If configuration changes aren't persisted:
 
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
 - [Examples](./EXAMPLES.md) - Automation and dashboard examples
+- [PV-Surplus Charging](./PV_SURPLUS_CHARGING.md) - Complete example: charging from PV surplus with an EDL21 grid meter
 - [Supported Devices](./SUPPORTED_DEVICES.md) - Real-hardware compatibility results (currently empty — no device validated yet)
 - [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
 - [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues) - Report problems

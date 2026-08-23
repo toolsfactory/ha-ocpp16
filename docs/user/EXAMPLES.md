@@ -7,6 +7,9 @@ Replace entity/device IDs like `sensor.ladepunkt_1` and `<connector device id>` 
 ones after setting up the integration — see [GETTING_STARTED.md](./GETTING_STARTED.md) for how
 devices/entities are named.
 
+Looking for a complete, real-world automation instead of individual snippets? See
+[PV_SURPLUS_CHARGING.md](./PV_SURPLUS_CHARGING.md) for a full PV-surplus charging control loop.
+
 ## Automations
 
 ### Notify when a connector faults
@@ -185,5 +188,6 @@ first transaction.
 
 - [Configuration Reference](./CONFIGURATION.md) - All configuration options and the full service reference
 - [Getting Started](./GETTING_STARTED.md) - Installation and initial setup
+- [PV-Surplus Charging](./PV_SURPLUS_CHARGING.md) - Complete example: charging from PV surplus with an EDL21 grid meter
 - [Interop Contract](../development/INTEROP_CONTRACT.md) - Building another integration against OCPP
 - [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues) - Report problems

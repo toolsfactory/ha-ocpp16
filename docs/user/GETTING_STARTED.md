@@ -244,6 +244,7 @@ Add this to `configuration.yaml`, restart, and reproduce the issue. Check logs f
 
 - See [CONFIGURATION.md](./CONFIGURATION.md) for detailed configuration options and the full service reference
 - See [EXAMPLES.md](./EXAMPLES.md) for more automation examples
+- See [PV_SURPLUS_CHARGING.md](./PV_SURPLUS_CHARGING.md) for a complete PV-surplus charging automation
 - See [SUPPORTED_DEVICES.md](./SUPPORTED_DEVICES.md) for real-hardware results (help wanted — none validated yet)
 - Report issues at [GitHub Issues](https://github.com/toolsfactory/ha-ocpp16/issues)
 
