@@ -20,7 +20,7 @@ colorlog==6.12.0
 
 # Standalone OCPP console (core/console.py) — not part of the HA runtime,
 # never imported when the integration loads inside Home Assistant.
-prompt_toolkit>=3.0,<4.0
+prompt_toolkit>=3.0.53,<4.0
 
 # Agent Skills reference validator (https://agentskills.io)
 # Optional cross-check used by script/skills-check on top of its own validation.
