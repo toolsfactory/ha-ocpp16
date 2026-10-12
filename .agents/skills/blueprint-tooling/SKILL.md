@@ -194,4 +194,4 @@ Review before merging.
   exists; otherwise those updates are skipped with a notice in the run summary.
 
 Background, recovery procedures, and the default exclusion list are in
-[`references/template-sync.md`](references/template-sync.md).
+[`docs/development/CUSTOMIZATION.md`](../../../docs/development/CUSTOMIZATION.md).
