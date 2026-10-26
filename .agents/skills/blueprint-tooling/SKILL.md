@@ -73,6 +73,7 @@ script/architecture-check # conservative architecture guardrails (also part of l
 script/version           # read the canonical version from manifest.json
 script/ha-version-sync   # align the pinned Home Assistant version across config files
 script/clean             # remove caches, logs, build artifacts
+script/prune-blueprint   # list (--apply: remove) blueprint-only leftovers, e.g. after a template sync
 script/help              # list every script with its description
 ```
 
@@ -194,4 +195,4 @@ Review before merging.
   exists; otherwise those updates are skipped with a notice in the run summary.
 
 Background, recovery procedures, and the default exclusion list are in
-[`references/template-sync.md`](references/template-sync.md).
+[`docs/development/CUSTOMIZATION.md`](../../../docs/development/CUSTOMIZATION.md).

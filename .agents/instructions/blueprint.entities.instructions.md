@@ -49,7 +49,7 @@ assumes have already been made.
 
 ## Base Entity Inheritance
 
-**MUST inherit from:** `({ClassPrefix}Entity, PlatformEntity)` — the integration's base entity class from `..entity`, order matters for MRO. The base class first, matching Home Assistant Core's own convention for a coordinator/domain mixin combined with a platform entity class — this keeps the mixin's overrides (`available`, `should_poll`, `__init__`) winning in the MRO even if a future HA release adds a conflicting member to the platform class.
+**MUST inherit from:** `(PlatformEntity, {ClassPrefix}Entity)` — the integration's base entity class from `..entity`, order matters for MRO
 
 **Base class provides:** Coordinator integration, device info, unique ID (`{entry_id}_{description.key}`), attribution, entity naming
 
@@ -182,7 +182,7 @@ Per-platform members and the trap each platform carries:
 [`ha-entity-platform/references/platform-members.md`](../skills/ha-entity-platform/references/platform-members.md).
 Read the row for the platform you are adding.
 
-**Write operations:** call the API client through `entry.runtime_data`, then `await coordinator.async_request_refresh()`.
+**Write operations:** go through `self._async_write(lambda client: client.async_x(...), "translation_key")` on the base entity. It reaches the API client, turns a client error into a translated `HomeAssistantError` and then awaits `coordinator.async_request_refresh()`.
 Never mutate local state and assume it took — unless the device cannot report its state back at all (one-way RF or IR),
 in which case set `_attr_assumed_state = True` and write the optimistic state. The frontend then shows discrete on/off
 buttons instead of a toggle.
