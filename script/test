@@ -32,11 +32,6 @@ source "$SCRIPT_DIR/.lib/integration.sh"
 
 activate_venv
 
-# Clean up any accidental package installation from pytest/test dependencies on every exit path
-# (success, a failing test under `set -e`, or any other early exit) -- this prevents Home Assistant
-# from loading an installed version instead of the development version from custom_components/.
-trap '"$SCRIPT_DIR/clean" --minimal' EXIT
-
 # Parse coverage flags
 COVERAGE_ARGS=()
 PYTEST_ARGS=()
@@ -58,13 +53,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# pytest is expected to already be on PATH via script/setup/bootstrap (HA's own
-# requirements_test.txt) -- there is no "test" extra in pyproject.toml to fall back to, and a
-# broken editable-install fallback here previously left `ocpp` itself importable, which can
-# shadow `custom_components.ocpp16` in Home Assistant's loader.
+# Check if pytest is available
 if ! python -c "import pytest" 2>/dev/null; then
-    log_error "pytest not found. Run: script/setup/bootstrap"
-    exit 1
+    log_info "pytest not found. Installing test dependencies..."
+    uv pip install -e ".[test]"
 fi
 
 # Run pytest with project configuration
@@ -91,3 +83,8 @@ if [[ ${#COVERAGE_ARGS[@]} -gt 0 ]] && [[ " ${COVERAGE_ARGS[*]} " =~ " --cov-rep
     echo ""
     log_success "Coverage report generated in htmlcov/index.html"
 fi
+
+# Clean up any accidental package installation from pytest/test dependencies
+# This prevents Home Assistant from loading the installed version instead of
+# the development version from custom_components/
+"$SCRIPT_DIR/clean" --minimal
