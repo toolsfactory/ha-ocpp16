@@ -48,23 +48,13 @@ fi
 
 # Uninstall if accidentally installed (always, even in minimal mode)
 # Find all non-symlink directories in custom_components/
-#
-# Only an *editable* install of a directory under custom_components/ is the accidental-self-install
-# failure mode this guards against (e.g. a broken `pip install -e .` fallback shadowing the real
-# custom_components/<domain> source, see script/test's history). Checking mere package *existence*
-# by name is not enough: an integration's domain can legitimately collide with a real PyPI
-# dependency's import name -- this project's own domain used to be exactly that ("ocpp", the
-# same name as the OCPP protocol library it depends on) before it was renamed to "ocpp16" --
-# uninstalling on a name match alone would remove a genuine, needed dependency every time this
-# cleanup runs.
 if [[ -d custom_components ]]; then
     while IFS= read -r -d '' dir; do
         if [[ -d "$dir" && ! -L "${dir%/}" ]]; then
             PACKAGE_NAME=$(basename "$dir")
-            EDITABLE_LOCATION=$(pip show "$PACKAGE_NAME" 2>/dev/null | sed -n 's/^Editable project location: //p' || true)
-            if [[ -n $EDITABLE_LOCATION && $EDITABLE_LOCATION == "$PWD"* ]]; then
+            if pip show "$PACKAGE_NAME" >/dev/null 2>&1; then
                 if [[ $MINIMAL_MODE == false ]]; then
-                    log_step "Uninstalling accidentally editable-installed package: $PACKAGE_NAME"
+                    log_step "Uninstalling accidentally installed package: $PACKAGE_NAME"
                 fi
                 pip uninstall -y "$PACKAGE_NAME" >/dev/null 2>&1 || true
             fi
